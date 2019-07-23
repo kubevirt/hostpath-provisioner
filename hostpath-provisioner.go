@@ -24,9 +24,9 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
-	"sigs.k8s.io/sig-storage-lib-external-provisioner/controller"
+	"kubevirt.io/hostpath-provisioner/controller"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -42,7 +42,7 @@ var provisionerName string
 type hostPathProvisioner struct {
 	pvDir    string
 	identity string
-	id       string
+	nodeName string
 }
 
 var provisionerID string
@@ -59,12 +59,11 @@ func NewHostPathProvisioner() controller.Provisioner {
 		glog.Fatal("env variable PV_DIR must be set so that this provisioner knows where to place its data")
 	}
 	glog.Infof("initiating kubevirt/hostpath-provisioner on node: %s\n", nodeName)
-	provisionerID = "kubevirt.io/hpp-" + nodeName
-	provisionerName = provisionerID
+	provisionerName = "kubevirt.io/hostpath-provisioner"
 	return &hostPathProvisioner{
 		pvDir:    pvDir,
-		identity: nodeName,
-		id:       provisionerID,
+		identity: provisionerName,
+		nodeName: nodeName,
 	}
 }
 
@@ -72,6 +71,17 @@ var _ controller.Provisioner = &hostPathProvisioner{}
 
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *hostPathProvisioner) Provision(options controller.ProvisionOptions) (*v1.PersistentVolume, error) {
+	isThisNode := false
+	annos := options.PVC.GetAnnotations()
+	if val, ok := annos["kubevirt.io/provisionOnNode"]; ok {
+		if val == p.nodeName {
+			isThisNode = true
+		}
+	}
+	if !isThisNode {
+		glog.Infof("Node atrribute does not match this node (%s)\n", p.identity)
+		return nil, &controller.IgnoredError{Reason: "identity annotation on PV does not match ours"}
+	}
 	path := path.Join(p.pvDir, options.PVC.Namespace+"-"+options.PVC.Name+"-"+options.PVName)
 	glog.Infof("creating backing directory: %v", path)
 
@@ -115,7 +125,7 @@ func (p *hostPathProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	path := volume.Spec.PersistentVolumeSource.HostPath.Path
-	glog.Info("removing backing directory: %v", path)
+	glog.Infof("removing backing directory: %v", path)
 	if err := os.RemoveAll(path); err != nil {
 		return err
 	}

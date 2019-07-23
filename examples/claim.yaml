@@ -1,11 +1,11 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: hostpath-pvc
+  name: hpp-claim
 spec:
-  storageClassName: "example-hostpath"
+  storageClassName: "kubevirt-hpp"
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 1Mi

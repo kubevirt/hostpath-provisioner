@@ -14,14 +14,17 @@
 
 IMAGE?=hostpath-provisioner
 
-all: dep hostpath-provisioner image push
+all: dep controller hostpath-provisioner image push
 
 dep:
 	-dep init
 	dep ensure
 
-hostpath-provisioner:
-	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o hostpath-provisioner .
+controller:
+	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' controller
+
+hostpath-provisioner: controller
+	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o _out/hostpath-provisioner hostpath-provisioner.go
 
 image: hostpath-provisioner
 	docker build -t $(IMAGE) -f Dockerfile .

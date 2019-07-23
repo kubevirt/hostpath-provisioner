@@ -599,13 +599,9 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:1628303a766eb8b6a1185756a064843933f453851720ad75e219489356dc26fa"
+  digest = "1:ed73c88f1bd6521d1cc846e9e4fa4a18a140d3c59c6d9add4c419de4a8573bd9"
   name = "sigs.k8s.io/sig-storage-lib-external-provisioner"
-  packages = [
-    "controller",
-    "controller/metrics",
-    "util",
-  ]
+  packages = ["util"]
   pruneopts = "UT"
   revision = "d22b74e900af4bf90174d259c3e52c3680b41ab4"
 
@@ -622,12 +618,31 @@
   analyzer-version = 1
   input-imports = [
     "github.com/golang/glog",
+    "github.com/prometheus/client_golang/prometheus",
+    "github.com/prometheus/client_golang/prometheus/promhttp",
+    "golang.org/x/time/rate",
     "k8s.io/api/core/v1",
+    "k8s.io/api/storage/v1",
+    "k8s.io/api/storage/v1beta1",
+    "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
+    "k8s.io/apimachinery/pkg/util/runtime",
+    "k8s.io/apimachinery/pkg/util/uuid",
+    "k8s.io/apimachinery/pkg/util/version",
     "k8s.io/apimachinery/pkg/util/wait",
+    "k8s.io/client-go/informers",
     "k8s.io/client-go/kubernetes",
+    "k8s.io/client-go/kubernetes/scheme",
+    "k8s.io/client-go/kubernetes/typed/core/v1",
     "k8s.io/client-go/rest",
-    "sigs.k8s.io/sig-storage-lib-external-provisioner/controller",
+    "k8s.io/client-go/tools/cache",
+    "k8s.io/client-go/tools/leaderelection",
+    "k8s.io/client-go/tools/leaderelection/resourcelock",
+    "k8s.io/client-go/tools/record",
+    "k8s.io/client-go/tools/reference",
+    "k8s.io/client-go/util/workqueue",
+    "k8s.io/klog",
+    "sigs.k8s.io/sig-storage-lib-external-provisioner/util",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

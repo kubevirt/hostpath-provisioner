@@ -1,3 +1,3 @@
-FROM alpine:3.4
-COPY hostpath-provisioner /
+FROM registry.fedoraproject.org/fedora-minimal:30
+COPY _out/hostpath-provisioner /
 CMD ["/hostpath-provisioner"]
