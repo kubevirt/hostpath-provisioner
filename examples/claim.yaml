@@ -1,7 +1,9 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: hpp-claim
+  name: kube-1-hpp-claim
+  annotations: 
+    kubevirt.io/provisionOnNode: kube-1
 spec:
   storageClassName: "kubevirt-hpp"
   accessModes:
