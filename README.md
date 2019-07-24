@@ -1,5 +1,7 @@
 # kubevirt.io/hostpath-provisioner
 
+A special multi-node version of the kubernetes hostpath provisioner.
+
 ## Overview
 
 This is a special version of the kubernetes hostpath provisioner, it's a slightly modified version of the sig storage [example hostpath prvisioner](https://github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/tree/master/examples/hostpath-provisioner).
