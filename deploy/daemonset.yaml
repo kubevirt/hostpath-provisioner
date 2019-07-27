@@ -19,21 +19,17 @@ spec:
           image: jgriffith/hpp
           imagePullPolicy: Always
           env:
-            - name: NODE_NAME
+            - name: NODE_NAME # matches kubernetes.io/hostname for the Node our provisioner pod is deployed on
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
             - name: PV_DIR
-              value: /var/hpvolumes
-#           - name: PV_RECLAIM_POLICY
-#             value: Retain
+              value: /var/hostpath-volumes
 
           volumeMounts:
             - name: pv-volume # root dir where your bind mounts will be on the node
-              mountPath: /var/hpvolumes
-              #nodeSelector:
-              #- name: xxxxxx
+              mountPath: /var/hostpath-volumes # match PV_DIR variable
       volumes:
         - name: pv-volume
           hostPath:
-            path: /var/hpvolumes
+            path: /var/hostpath-volumes # match PV_DIR variable
