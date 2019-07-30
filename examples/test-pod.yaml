@@ -14,10 +14,10 @@ spec:
     volumeMounts:
       - name: hostpath-pvc
         mountPath: "/mnt"
-    nodeSelector:
-      kubernetes.io/hostname: kube-1
+  nodeSelector:
+    kubernetes.io/hostname: kube-1
   restartPolicy: "Never"
   volumes:
     - name: hostpath-pvc
       persistentVolumeClaim:
-        claimName: hostpath-pvc
+        claimName: kube-1-hpp-claim

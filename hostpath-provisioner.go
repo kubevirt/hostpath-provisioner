@@ -21,6 +21,7 @@ import (
 	"flag"
 	"os"
 	"path"
+	"strings"
 	"syscall"
 
 	"github.com/golang/glog"
@@ -40,52 +41,70 @@ const (
 var provisionerName string
 
 type hostPathProvisioner struct {
-	pvDir    string
-	identity string
-	nodeName string
+	pvDir           string
+	identity        string
+	nodeName        string
+	useNamingPrefix bool
 }
 
 var provisionerID string
 
 // NewHostPathProvisioner creates a new hostpath provisioner
 func NewHostPathProvisioner() controller.Provisioner {
+	useNamingPrefix := false
 	nodeName := os.Getenv("NODE_NAME")
 	if nodeName == "" {
 		glog.Fatal("env variable NODE_NAME must be set so that this provisioner can identify itself")
 	}
 
+	// note that the pvDir variable informs us *where* the provisioner should be writing backing files to
+	// this needs to match the path speciied in the volumes.hostPath spec of the deployment
 	pvDir := os.Getenv("PV_DIR")
 	if pvDir == "" {
 		glog.Fatal("env variable PV_DIR must be set so that this provisioner knows where to place its data")
 	}
+	if strings.ToLower(os.Getenv("USE_NAMING_PREFIX")) == "true" {
+		useNamingPrefix = true
+	}
 	glog.Infof("initiating kubevirt/hostpath-provisioner on node: %s\n", nodeName)
 	provisionerName = "kubevirt.io/hostpath-provisioner"
 	return &hostPathProvisioner{
-		pvDir:    pvDir,
-		identity: provisionerName,
-		nodeName: nodeName,
+		pvDir:           pvDir,
+		identity:        provisionerName,
+		nodeName:        nodeName,
+		useNamingPrefix: useNamingPrefix,
 	}
 }
 
 var _ controller.Provisioner = &hostPathProvisioner{}
 
+func isCorrectNode(annotations map[string]string, nodeName string) bool {
+	if val, ok := annotations["kubevirt.io/provisionOnNode"]; ok {
+		glog.Infof("claim included provisionOnNode annotation: %s\n", val)
+		if val == nodeName {
+			glog.Infof("matched provisionOnNode: %s with this node: %s\n", val, nodeName)
+			return true
+		}
+		glog.Infof("no match for provisionOnNode: %s with this node: %s\n", val, nodeName)
+		return false
+	}
+	glog.Info("missing kubevirt.io/provisionerOnNode annotation, skipping operations for pvc")
+	return false
+}
+
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *hostPathProvisioner) Provision(options controller.ProvisionOptions) (*v1.PersistentVolume, error) {
-	isThisNode := false
-	annos := options.PVC.GetAnnotations()
-	if val, ok := annos["kubevirt.io/provisionOnNode"]; ok {
-		if val == p.nodeName {
-			isThisNode = true
-		}
-	}
+	isThisNode := isCorrectNode(options.PVC.GetAnnotations(), p.nodeName)
 	if !isThisNode {
-		glog.Infof("Node atrribute does not match this node (%s)\n", p.identity)
-		return nil, &controller.IgnoredError{Reason: "identity annotation on PV does not match ours"}
+		return nil, &controller.IgnoredError{Reason: "identity annotation on pvc does not match ours"}
 	}
-	path := path.Join(p.pvDir, options.PVC.Namespace+"-"+options.PVC.Name+"-"+options.PVName)
-	glog.Infof("creating backing directory: %v", path)
+	vPath := path.Join(p.pvDir, options.PVName)
+	if p.useNamingPrefix {
+		vPath = path.Join(p.pvDir, options.PVC.Name+"-"+options.PVName)
+	}
+	glog.Infof("creating backing directory: %v", vPath)
 
-	if err := os.MkdirAll(path, 0777); err != nil {
+	if err := os.MkdirAll(vPath, 0777); err != nil {
 		return nil, err
 	}
 
@@ -104,7 +123,24 @@ func (p *hostPathProvisioner) Provision(options controller.ProvisionOptions) (*v
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				HostPath: &v1.HostPathVolumeSource{
-					Path: path,
+					Path: vPath,
+				},
+			},
+			NodeAffinity: &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "kubernetes.io/hostname",
+									Operator: v1.NodeSelectorOpIn,
+									Values: []string{
+										p.nodeName,
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
