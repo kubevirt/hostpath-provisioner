@@ -19,6 +19,7 @@ package main
 import (
 	"errors"
 	"flag"
+	"math"
 	"os"
 	"path"
 	"strings"
@@ -29,6 +30,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -99,43 +101,47 @@ func (p *hostPathProvisioner) Provision(options controller.ProvisionOptions) (*v
 		return nil, &controller.IgnoredError{Reason: "identity annotation on pvc does not match ours"}
 	}
 	vPath := path.Join(p.pvDir, options.PVName)
+	pvCapacity, err := calculatePvCapacity(p.pvDir)
 	if p.useNamingPrefix {
 		vPath = path.Join(p.pvDir, options.PVC.Name+"-"+options.PVName)
 	}
-	glog.Infof("creating backing directory: %v", vPath)
 
-	if err := os.MkdirAll(vPath, 0777); err != nil {
-		return nil, err
-	}
+	if pvCapacity != nil {
+		glog.Infof("creating backing directory: %v", vPath)
 
-	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: options.PVName,
-			Annotations: map[string]string{
-				"hostPathProvisionerIdentity": p.identity,
-			},
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-			AccessModes:                   options.PVC.Spec.AccessModes,
-			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
-			},
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				HostPath: &v1.HostPathVolumeSource{
-					Path: vPath,
+		if err := os.MkdirAll(vPath, 0777); err != nil {
+			return nil, err
+		}
+
+		pv := &v1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: options.PVName,
+				Annotations: map[string]string{
+					"hostPathProvisionerIdentity": p.identity,
 				},
 			},
-			NodeAffinity: &v1.VolumeNodeAffinity{
-				Required: &v1.NodeSelector{
-					NodeSelectorTerms: []v1.NodeSelectorTerm{
-						{
-							MatchExpressions: []v1.NodeSelectorRequirement{
-								{
-									Key:      "kubernetes.io/hostname",
-									Operator: v1.NodeSelectorOpIn,
-									Values: []string{
-										p.nodeName,
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+				AccessModes:                   options.PVC.Spec.AccessModes,
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): *pvCapacity,
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					HostPath: &v1.HostPathVolumeSource{
+						Path: vPath,
+					},
+				},
+				NodeAffinity: &v1.VolumeNodeAffinity{
+					Required: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/hostname",
+										Operator: v1.NodeSelectorOpIn,
+										Values: []string{
+											p.nodeName,
+										},
 									},
 								},
 							},
@@ -143,10 +149,11 @@ func (p *hostPathProvisioner) Provision(options controller.ProvisionOptions) (*v
 					},
 				},
 			},
-		},
+		}
+		return pv, nil
+	} else {
+		return nil, err
 	}
-
-	return pv, nil
 }
 
 // Delete removes the storage asset that was created by Provision represented
@@ -167,6 +174,22 @@ func (p *hostPathProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	return nil
+}
+
+func calculatePvCapacity(path string) (*resource.Quantity, error) {
+	var stat syscall.Statfs_t
+	err := syscall.Statfs(path, &stat)
+	if err != nil {
+		return nil, err
+	}
+	totalSize := stat.Blocks * uint64(stat.Bsize)
+	if totalSize > math.MaxInt64 {
+		glog.Error("Calculated total disk size larger than: %d", math.MaxInt64)
+		return nil, errors.New("Total available space doesn't fit in int64")
+	}
+	quantity := resource.NewScaledQuantity(int64(totalSize), 0)
+	quantity.RoundUp(resource.Giga)
+	return quantity, nil
 }
 
 func main() {
