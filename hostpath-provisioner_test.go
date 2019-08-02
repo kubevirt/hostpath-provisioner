@@ -17,10 +17,8 @@ limitations under the License.
 package main
 
 import (
-	"reflect"
+	"golang.org/x/sys/unix"
 	"testing"
-
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func getKubevirtNodeAnnotation(value string) map[string]string {
@@ -79,13 +77,33 @@ func Test_calculatePvCapacity(t *testing.T) {
 	type args struct {
 		path string
 	}
+	// Get total size of wherever we are running.
+	capacity, _ := getTotalCapacity(".")
+	// Do the round down same as the calculation so we can compare
+	constQuantity := roundDownCapacityPretty(capacity)
+
 	tests := []struct {
 		name    string
 		args    args
-		want    *resource.Quantity
+		want    int64
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "Reports correct size for known directory",
+			args: args{
+				path: ".",
+			},
+			want: constQuantity,
+			wantErr: false,
+		},
+		{
+			name: "Reports error for invalid directory",
+			args: args{
+				path: "/doesntexist",
+			},
+			want: constQuantity,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -94,9 +112,74 @@ func Test_calculatePvCapacity(t *testing.T) {
 				t.Errorf("calculatePvCapacity() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if err == nil && got.CmpInt64(tt.want) != 0 {
 				t.Errorf("calculatePvCapacity() = %v, want %v", got, tt.want)
 			}
 		})
 	}
+}
+
+func Test_roundDownCapacityPretty(t *testing.T) {
+	type args struct {
+		size int64
+	}
+
+	tests := []struct {
+		name    string
+		args    args
+		want    int64
+		wantErr bool
+	}{
+		{
+			name: "Rounds Gigs properly",
+			args: args{
+				size: int64(2 * GiB),
+			},
+			want: int64(2 * GiB),
+			wantErr: false,
+		},
+		{
+			name: "Rounds Gigs properly with minor add",
+			args: args{
+				size: int64((2 * GiB) + 2),
+			},
+			want: int64(2 * GiB),
+			wantErr: false,
+		},
+		{
+			name: "Not large enough for GiB, rounded down to smaller MiB",
+			args: args{
+				size: int64((2 * GiB) - 2),
+			},
+			want: int64(2047 * MiB),
+			wantErr: false,
+		},
+		{
+			name: "Large GiB, rounded down to one smaller GiB",
+			args: args{
+				size: int64((20 * GiB) - 2),
+			},
+			want: int64(19 * GiB),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := roundDownCapacityPretty(tt.args.size)
+			if got != tt.want {
+				t.Errorf("calculatePvCapacity() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func getTotalCapacity(path string) (int64, error) {
+	statfs := &unix.Statfs_t{}
+	err := unix.Statfs(path, statfs)
+	if err != nil {
+		return int64(-1), err
+	}
+
+	// Capacity is total block count * block size
+	return int64(statfs.Blocks) * statfs.Bsize, nil
 }
