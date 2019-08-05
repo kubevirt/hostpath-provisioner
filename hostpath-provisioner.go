@@ -19,7 +19,7 @@ package main
 import (
 	"errors"
 	"flag"
-	"math"
+	"golang.org/x/sys/unix"
 	"os"
 	"path"
 	"strings"
@@ -48,6 +48,15 @@ type hostPathProvisioner struct {
 	nodeName        string
 	useNamingPrefix bool
 }
+
+// Common allocation units
+const (
+	KiB int64 = 1024
+	MiB int64 = 1024 * KiB
+	GiB int64 = 1024 * MiB
+	TiB int64 = 1024 * GiB
+)
+
 
 var provisionerID string
 
@@ -94,12 +103,24 @@ func isCorrectNode(annotations map[string]string, nodeName string) bool {
 	return false
 }
 
+func (p *hostPathProvisioner) ShouldProvision(pvc *v1.PersistentVolumeClaim) bool {
+	shouldProvision := isCorrectNode(pvc.GetAnnotations(), p.nodeName)
+	
+	if shouldProvision {
+		pvCapacity, err := calculatePvCapacity(p.pvDir)
+		if pvCapacity != nil && pvCapacity.Cmp(pvc.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]) < 0 {
+			glog.Error("PVC request size larger than total possible PV size")
+			shouldProvision = false;
+		} else if err != nil {
+			glog.Errorf("Unable to determine pvCapacity %v", err)			
+			shouldProvision = false;
+		}
+	}
+	return shouldProvision;
+}
+
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *hostPathProvisioner) Provision(options controller.ProvisionOptions) (*v1.PersistentVolume, error) {
-	isThisNode := isCorrectNode(options.PVC.GetAnnotations(), p.nodeName)
-	if !isThisNode {
-		return nil, &controller.IgnoredError{Reason: "identity annotation on pvc does not match ours"}
-	}
 	vPath := path.Join(p.pvDir, options.PVName)
 	pvCapacity, err := calculatePvCapacity(p.pvDir)
 	if p.useNamingPrefix {
@@ -177,20 +198,33 @@ func (p *hostPathProvisioner) Delete(volume *v1.PersistentVolume) error {
 }
 
 func calculatePvCapacity(path string) (*resource.Quantity, error) {
-	var stat syscall.Statfs_t
-	err := syscall.Statfs(path, &stat)
+	statfs := &unix.Statfs_t{}
+	err := unix.Statfs(path, statfs)
 	if err != nil {
 		return nil, err
 	}
-	totalSize := stat.Blocks * uint64(stat.Bsize)
-	if totalSize > math.MaxInt64 {
-		glog.Errorf("Calculated total disk size larger than: %d", math.MaxInt64)
-		return nil, errors.New("Total available space doesn't fit in int64")
-	}
-	quantity := resource.NewScaledQuantity(int64(totalSize), 0)
-	quantity.RoundUp(resource.Giga)
+	// Capacity is total block count * block size
+	quantity := resource.NewQuantity(int64(roundDownCapacityPretty(int64(statfs.Blocks) * statfs.Bsize)), resource.BinarySI)
 	return quantity, nil
 }
+
+// Round down the capacity to an easy to read value. Blatantly stolen from here: https://github.com/kubernetes-incubator/external-storage/blob/master/local-volume/provisioner/pkg/discovery/discovery.go#L339
+func roundDownCapacityPretty(capacityBytes int64) int64 {
+
+	easyToReadUnitsBytes := []int64{GiB, MiB}
+
+	// Round down to the nearest easy to read unit
+	// such that there are at least 10 units at that size.
+	for _, easyToReadUnitBytes := range easyToReadUnitsBytes {
+		// Round down the capacity to the nearest unit.
+		size := capacityBytes / easyToReadUnitBytes
+		if size >= 10 {
+			return size * easyToReadUnitBytes
+		}
+	}
+	return capacityBytes
+}
+
 
 func main() {
 	syscall.Umask(0)
