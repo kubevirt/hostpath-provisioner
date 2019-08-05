@@ -29,8 +29,8 @@ import (
 	"kubevirt.io/hostpath-provisioner/controller"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -184,7 +184,7 @@ func calculatePvCapacity(path string) (*resource.Quantity, error) {
 	}
 	totalSize := stat.Blocks * uint64(stat.Bsize)
 	if totalSize > math.MaxInt64 {
-		glog.Error("Calculated total disk size larger than: %d", math.MaxInt64)
+		glog.Errorf("Calculated total disk size larger than: %d", math.MaxInt64)
 		return nil, errors.New("Total available space doesn't fit in int64")
 	}
 	quantity := resource.NewScaledQuantity(int64(totalSize), 0)
