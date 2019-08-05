@@ -17,8 +17,7 @@ IMAGE?=hostpath-provisioner
 all: dep controller hostpath-provisioner image push
 
 dep:
-	-dep init
-	dep ensure
+	dep check  # use `dep ensure -add xxxxx` for any missing packages
 
 controller:
 	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' controller
@@ -35,3 +34,6 @@ clean:
 	rm -rf vendor
 	rm -rf Gopkg.lock
 	rm -rf hostpath-provisioner
+build: clean dep controller hostpath-provisioner
+test:
+	go test -v ./...
