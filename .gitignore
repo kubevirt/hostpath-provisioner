@@ -2,3 +2,4 @@ _out/*
 **/*.swp
 .vscode
 hostpath-provisioner
+cmd/provisioner/provisioner

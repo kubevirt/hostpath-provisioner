@@ -23,7 +23,7 @@ controller:
 	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' controller
 
 hostpath-provisioner: controller
-	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o _out/hostpath-provisioner hostpath-provisioner.go
+	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o _out/hostpath-provisioner cmd/provisioner/hostpath-provisioner.go
 
 image: hostpath-provisioner
 	docker build -t $(IMAGE) -f Dockerfile .
@@ -38,3 +38,4 @@ build: clean dep controller hostpath-provisioner
 
 test:
 	go test -v ./...
+	hack/run-lint-checks.sh
