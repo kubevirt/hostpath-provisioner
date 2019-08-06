@@ -14,7 +14,7 @@
 
 IMAGE?=hostpath-provisioner
 
-all: dep controller hostpath-provisioner image push
+all: dep controller hostpath-provisioner
 
 dep:
 	dep check  # use `dep ensure -add xxxxx` for any missing packages
@@ -30,10 +30,11 @@ image: hostpath-provisioner
 
 push: hostpath-provisioner image
 	docker push $(IMAGE)
+
 clean:
-	rm -rf vendor
-	rm -rf Gopkg.lock
-	rm -rf hostpath-provisioner
+	rm -rf _out
+
 build: clean dep controller hostpath-provisioner
+
 test:
 	go test -v ./...
