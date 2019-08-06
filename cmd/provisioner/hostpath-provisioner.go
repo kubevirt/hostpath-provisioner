@@ -19,11 +19,12 @@ package main
 import (
 	"errors"
 	"flag"
-	"golang.org/x/sys/unix"
 	"os"
 	"path"
 	"strings"
 	"syscall"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/golang/glog"
 	"kubevirt.io/hostpath-provisioner/controller"
@@ -56,7 +57,6 @@ const (
 	GiB int64 = 1024 * MiB
 	TiB int64 = 1024 * GiB
 )
-
 
 var provisionerID string
 
@@ -105,18 +105,18 @@ func isCorrectNode(annotations map[string]string, nodeName string) bool {
 
 func (p *hostPathProvisioner) ShouldProvision(pvc *v1.PersistentVolumeClaim) bool {
 	shouldProvision := isCorrectNode(pvc.GetAnnotations(), p.nodeName)
-	
+
 	if shouldProvision {
 		pvCapacity, err := calculatePvCapacity(p.pvDir)
 		if pvCapacity != nil && pvCapacity.Cmp(pvc.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]) < 0 {
 			glog.Error("PVC request size larger than total possible PV size")
-			shouldProvision = false;
+			shouldProvision = false
 		} else if err != nil {
-			glog.Errorf("Unable to determine pvCapacity %v", err)			
-			shouldProvision = false;
+			glog.Errorf("Unable to determine pvCapacity %v", err)
+			shouldProvision = false
 		}
 	}
-	return shouldProvision;
+	return shouldProvision
 }
 
 // Provision creates a storage asset and returns a PV object representing it.
@@ -172,9 +172,8 @@ func (p *hostPathProvisioner) Provision(options controller.ProvisionOptions) (*v
 			},
 		}
 		return pv, nil
-	} else {
-		return nil, err
 	}
+	return nil, err
 }
 
 // Delete removes the storage asset that was created by Provision represented
@@ -204,7 +203,7 @@ func calculatePvCapacity(path string) (*resource.Quantity, error) {
 		return nil, err
 	}
 	// Capacity is total block count * block size
-	quantity := resource.NewQuantity(int64(roundDownCapacityPretty(int64(statfs.Blocks) * statfs.Bsize)), resource.BinarySI)
+	quantity := resource.NewQuantity(int64(roundDownCapacityPretty(int64(statfs.Blocks)*statfs.Bsize)), resource.BinarySI)
 	return quantity, nil
 }
 
@@ -224,7 +223,6 @@ func roundDownCapacityPretty(capacityBytes int64) int64 {
 	}
 	return capacityBytes
 }
-
 
 func main() {
 	syscall.Umask(0)

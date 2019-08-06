@@ -93,7 +93,7 @@ func Test_calculatePvCapacity(t *testing.T) {
 			args: args{
 				path: ".",
 			},
-			want: constQuantity,
+			want:    constQuantity,
 			wantErr: false,
 		},
 		{
@@ -101,7 +101,7 @@ func Test_calculatePvCapacity(t *testing.T) {
 			args: args{
 				path: "/doesntexist",
 			},
-			want: constQuantity,
+			want:    constQuantity,
 			wantErr: true,
 		},
 	}
@@ -135,7 +135,7 @@ func Test_roundDownCapacityPretty(t *testing.T) {
 			args: args{
 				size: int64(2 * GiB),
 			},
-			want: int64(2 * GiB),
+			want:    int64(2 * GiB),
 			wantErr: false,
 		},
 		{
@@ -143,7 +143,7 @@ func Test_roundDownCapacityPretty(t *testing.T) {
 			args: args{
 				size: int64((2 * GiB) + 2),
 			},
-			want: int64(2 * GiB),
+			want:    int64(2 * GiB),
 			wantErr: false,
 		},
 		{
@@ -151,7 +151,7 @@ func Test_roundDownCapacityPretty(t *testing.T) {
 			args: args{
 				size: int64((2 * GiB) - 2),
 			},
-			want: int64(2047 * MiB),
+			want:    int64(2047 * MiB),
 			wantErr: false,
 		},
 		{
@@ -159,7 +159,7 @@ func Test_roundDownCapacityPretty(t *testing.T) {
 			args: args{
 				size: int64((20 * GiB) - 2),
 			},
-			want: int64(19 * GiB),
+			want:    int64(19 * GiB),
 			wantErr: false,
 		},
 	}
