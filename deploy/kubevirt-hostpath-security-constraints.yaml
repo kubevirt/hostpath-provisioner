@@ -1,0 +1,16 @@
+kind: SecurityContextConstraints
+apiVersion: v1
+metadata:
+  name: hostpath
+allowPrivilegedContainer: true
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: RunAsAny
+fsGroup:
+  type: RunAsAny
+supplementalGroups:
+  type: RunAsAny
+allowHostDirVolumePlugin: true
+users:
+- system:serviceaccount:kubevirt-hostpath-provisioner:kubevirt-hostpath-provisioner-admin
