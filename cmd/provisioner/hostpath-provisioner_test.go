@@ -18,7 +18,13 @@ package main
 
 import (
 	"golang.org/x/sys/unix"
+	"io/ioutil"
+	"os"
 	"testing"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func getKubevirtNodeAnnotation(value string) map[string]string {
@@ -68,6 +74,63 @@ func Test_isCorrectNode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isCorrectNode(tt.args.annotations, tt.args.nodeName); got != tt.want {
 				t.Errorf("isCorrectNode() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_Delete(t *testing.T) {
+	type args struct {
+		identity string
+		nodeName string
+	}
+	testProvisioner := &hostPathProvisioner{
+		nodeName: "testNode",
+		identity: "testId",
+	}
+
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "Delete not matching identity",
+			args: args{
+				identity: "anotherId",
+				nodeName: "testNode",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Delete not matching node",
+			args: args{
+				identity: "testId",
+				nodeName: "anotherNode",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Delete matching",
+			args: args{
+				identity: "testId",
+				nodeName: "testNode",
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		file, err := ioutil.TempFile("", "test")
+		if err != nil {
+			t.Errorf("Unable to create temporary directory, error = %v", err)
+		}
+		defer os.Remove(file.Name())
+		pv := createPv(tt.args.identity, tt.args.nodeName, file.Name())
+		t.Run(tt.name, func(t *testing.T) {
+			err := testProvisioner.Delete(pv)
+			if (err != nil) != tt.wantErr || (err == nil) == tt.wantErr {
+				t.Errorf("Delete, error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
 		})
 	}
@@ -182,4 +245,47 @@ func getTotalCapacity(path string) (int64, error) {
 
 	// Capacity is total block count * block size
 	return int64(statfs.Blocks) * statfs.Bsize, nil
+}
+
+func createPv(identity, nodeName, dirPath string) *v1.PersistentVolume {
+	return &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pv",
+			Annotations: map[string]string{
+				"hostPathProvisionerIdentity": identity,
+				"kubevirt.io/provisionOnNode": nodeName,
+			},
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse("2Gi"),
+			},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: dirPath,
+				},
+			},
+			NodeAffinity: &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "kubernetes.io/hostname",
+									Operator: v1.NodeSelectorOpIn,
+									Values: []string{
+										nodeName,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }

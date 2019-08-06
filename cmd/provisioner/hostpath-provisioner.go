@@ -139,6 +139,7 @@ func (p *hostPathProvisioner) Provision(options controller.ProvisionOptions) (*v
 				Name: options.PVName,
 				Annotations: map[string]string{
 					"hostPathProvisionerIdentity": p.identity,
+					"kubevirt.io/provisionOnNode": p.nodeName,
 				},
 			},
 			Spec: v1.PersistentVolumeSpec{
@@ -185,6 +186,9 @@ func (p *hostPathProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 	if ann != p.identity {
 		return &controller.IgnoredError{Reason: "identity annotation on PV does not match ours"}
+	}
+	if !isCorrectNode(volume.Annotations, p.nodeName) {
+		return &controller.IgnoredError{Reason: "identity annotation on pvc does not match ours, not deleting PV"}
 	}
 
 	path := volume.Spec.PersistentVolumeSource.HostPath.Path
