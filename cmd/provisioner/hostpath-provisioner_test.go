@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -31,6 +32,14 @@ func getKubevirtNodeAnnotation(value string) map[string]string {
 	annotation := make(map[string]string)
 	if value != "" {
 		annotation["kubevirt.io/provisionOnNode"] = value
+	}
+	return annotation
+}
+
+func getSelectedNodeAnnotation(value string) map[string]string {
+	annotation := make(map[string]string)
+	if value != "" {
+		annotation["volume.kubernetes.io/selected-node"] = value
 	}
 	return annotation
 }
@@ -72,8 +81,83 @@ func Test_isCorrectNode(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isCorrectNode(tt.args.annotations, tt.args.nodeName); got != tt.want {
+			if got := isCorrectNode(tt.args.annotations, tt.args.nodeName, "kubevirt.io/provisionOnNode"); got != tt.want {
 				t.Errorf("isCorrectNode() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_isCorrectNodeByBindingMode(t *testing.T) {
+	type args struct {
+		annotations map[string]string
+		nodeName    string
+		bindingMode storage.VolumeBindingMode
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "passes with correct node annotation, binding immediate",
+			args: args{
+				annotations: getKubevirtNodeAnnotation("test-node"),
+				nodeName:    "test-node",
+				bindingMode: storage.VolumeBindingImmediate,
+			},
+			want: true,
+		},
+		{
+			name: "skips with incorrect kubevirt node annotation",
+			args: args{
+				annotations: getKubevirtNodeAnnotation("test-node"),
+				nodeName:    "wrong-node",
+				bindingMode: storage.VolumeBindingImmediate,
+			},
+			want: false,
+		},
+		{
+			name: "skips with no kubevirt node annotation",
+			args: args{
+				annotations: getKubevirtNodeAnnotation(""),
+				nodeName:    "test-node",
+				bindingMode: storage.VolumeBindingImmediate,
+			},
+			want: false,
+		},
+		{
+			name: "passes with correct selected node annotation, binding waitForFirst",
+			args: args{
+				annotations: getSelectedNodeAnnotation("test-node"),
+				nodeName:    "test-node",
+				bindingMode: storage.VolumeBindingWaitForFirstConsumer,
+			},
+			want: true,
+		},
+		{
+			name: "passes with correct kubevirt node annotation, binding waitForFirst",
+			args: args{
+				annotations: getKubevirtNodeAnnotation("test-node"),
+				nodeName:    "test-node",
+				bindingMode: storage.VolumeBindingWaitForFirstConsumer,
+			},
+			want: true,
+		},
+		{
+			name: "skips with no selected node annotation binding waitForFirst",
+			args: args{
+				annotations: getSelectedNodeAnnotation(""),
+				nodeName:    "test-node",
+				bindingMode: storage.VolumeBindingWaitForFirstConsumer,
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isCorrectNodeByBindingMode(tt.args.annotations, tt.args.nodeName, tt.args.bindingMode); got != tt.want {
+				t.Errorf("isCorrectNodeByBindingMode() = %v, want %v", got, tt.want)
 			}
 		})
 	}

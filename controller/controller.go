@@ -1066,13 +1066,18 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 	if claim.Spec.VolumeName != "" {
 		return false, nil
 	}
+	claimClass := util.GetPersistentVolumeClaimClass(claim)
+	class, err := ctrl.getStorageClass(claimClass)
+	if err != nil {
+		glog.Errorf("Error getting claim %q's StorageClass's fields: %v", claimToClaimKey(claim), err)
+		return false, err
+	}
 
 	if qualifier, ok := ctrl.provisioner.(Qualifier); ok {
-		if !qualifier.ShouldProvision(claim) {
+		if !qualifier.ShouldProvision(claim, class.VolumeBindingMode) {
 			return false, nil
 		}
 	}
-
 	// Kubernetes 1.5 provisioning with annStorageProvisioner
 	if ctrl.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.5.0")) {
 		if provisioner, found := claim.Annotations[annStorageProvisioner]; found {
@@ -1082,12 +1087,6 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 		}
 	} else {
 		// Kubernetes 1.4 provisioning, evaluating class.Provisioner
-		claimClass := util.GetPersistentVolumeClaimClass(claim)
-		class, err := ctrl.getStorageClass(claimClass)
-		if err != nil {
-			glog.Errorf("Error getting claim %q's StorageClass's fields: %v", claimToClaimKey(claim), err)
-			return false, err
-		}
 		if class.Provisioner != ctrl.provisionerName {
 			return false, nil
 		}
