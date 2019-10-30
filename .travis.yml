@@ -11,6 +11,9 @@ before_install:
 - make dep
 - make test
 
+before_deploy:
+  - docker login quay.io -u="$QUAY_USER" -p="$QUAY_PASS"
+
 deploy:
 # Release :latest images
 - provider: script
