@@ -1,8 +1,13 @@
 kind: SecurityContextConstraints
 apiVersion: v1
 metadata:
-  name: hostpath
+  name: hostpath-provisioner
 allowPrivilegedContainer: true
+requiredDropCapabilities:
+- KILL
+- MKNOD
+- SETUID
+- SETGID
 runAsUser:
   type: RunAsAny
 seLinuxContext:
@@ -13,4 +18,6 @@ supplementalGroups:
   type: RunAsAny
 allowHostDirVolumePlugin: true
 users:
-- system:serviceaccount:kubevirt-hostpath-provisioner:kubevirt-hostpath-provisioner-admin
+- system:serviceaccount:hostpath-provisioner:hostpath-provisioner-admin
+volumes:
+- hostPath

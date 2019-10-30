@@ -1,8 +1,43 @@
 language: go
 go_import_path: kubevirt.io/hostpath-provisioner
 go:
-  - 1.11.5
+- 1.11.5
 before_install:
-  - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-  - make dep
-  - make test
+- curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+- make dep
+- make test
+
+deploy:
+# Release :latest images
+- provider: script
+  env:
+    - TAG=latest
+  script: make push
+  skip_cleanup: true
+  on:
+    branch: master
+    repo: kubevirt/hostpath-provisioner
+# Release versioned images
+- provider: script
+  env:
+    - TAG=$TRAVIS_TAG
+  script: make push
+  branches:
+      only: /v[0-9]+\.[0-9]+\.[0-9]+(-alpha\.[0-9]+){0,1}/
+  on:
+    tags: true
+    repo: kubevirt/hostpath-provisioner
+- provider: releases
+  branches:
+    only: /v[0-9]+\.[0-9]+\.[0-9]+(-alpha\.[0-9]+){0,1}/
+  on:
+    tags: true
+    repo: kubevirt/hostpath-provisioner
+  api_key:
+    secure: epJUqCAZoU5dnpXxaZ9Rhxxrj47FYobRD/XhTuAUm4X2vlMMltKZII7ETUto9hVTHofsppppouLun7ONmXe0zDsxiMgFFAgQUmM9K+SpDaWmzM/qIz1EDTQqoh0yvC9iH1x592w56+2UAEOc7u5D8fOGXNmViFqJTCFdYSGVoA5nEhs3LCW/gyDTeIvFCQ2SQxhaqW4ZaXnrcyyy8SAOEDG0++EzRe3DLPj8QX7EyPQba7JMDUdsmDbRI1Om+FIBD89riODGquLd2uKNpXXrhwZayizvanUtgJKFZ4IMcmoI1l6L1MXtgiFCtE/6R/Z1ICgvMYNLC7HY5mf3qYgNhrTFzv3p3bf5X9JqPaq73RhcR8K84T9/1L/2GoOB5wV0Zla80U5xOeBqdQ5lqRqe9AC3kUr8nECs8vigavF3aEpOM+vtJhn+5XFn4cqS351Mu2V4XKnFnBs4PDZQLsO/0cFdJNTXv42cSFNsgKESS3eFxyeye4da2yfqra4CuNUiezRwmPOB085Im/vJ4VcAtnqEQohQB3lXvtt+g1aMTzg8orPEiOdpMTb9BPy92d2cnaJpsfme+JjTOUG2I6jyC5GvehC64Fvr/S8iI0Ohch7wbFswcOE6zWcCOi4pG2IHB/lGr/tv0mONcv0ym+4+huj7/K0WYrNqix5ErhOcowk=
+  overwrite: true
+  skip_cleanup: true
+  file_glob: true
+  file:
+  - deploy/*.yaml
+

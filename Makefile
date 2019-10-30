@@ -13,6 +13,8 @@
 # limitations under the License.
 
 IMAGE?=hostpath-provisioner
+TAG?=latest
+DOCKER_REPO?=kubevirt
 
 all: dep controller hostpath-provisioner
 
@@ -26,10 +28,10 @@ hostpath-provisioner: controller
 	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o _out/hostpath-provisioner cmd/provisioner/hostpath-provisioner.go
 
 image: hostpath-provisioner
-	docker build -t $(IMAGE) -f Dockerfile .
+	docker build -t $(DOCKER_REPO)/$(IMAGE):$(TAG) -f Dockerfile .
 
 push: hostpath-provisioner image
-	docker push $(IMAGE)
+	docker push $(DOCKER_REPO)/$(IMAGE):$(TAG)
 
 clean:
 	rm -rf _out
