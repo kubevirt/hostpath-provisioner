@@ -1,3 +1,7 @@
+env:
+  global:
+    - DOCKER_REPO=quay.io/kubevirt
+
 language: go
 go_import_path: kubevirt.io/hostpath-provisioner
 go:
