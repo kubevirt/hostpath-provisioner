@@ -30,6 +30,7 @@ import (
 	"kubevirt.io/hostpath-provisioner/controller"
 
 	v1 "k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -89,22 +90,31 @@ func NewHostPathProvisioner() controller.Provisioner {
 
 var _ controller.Provisioner = &hostPathProvisioner{}
 
-func isCorrectNode(annotations map[string]string, nodeName string) bool {
-	if val, ok := annotations["kubevirt.io/provisionOnNode"]; ok {
-		glog.Infof("claim included provisionOnNode annotation: %s\n", val)
+func isCorrectNodeByBindingMode(annotations map[string]string, nodeName string, bindingMode storage.VolumeBindingMode) bool {
+	glog.Infof("isCorrectNodeByBindingMode mode: %s", string(bindingMode))
+	if bindingMode == storage.VolumeBindingWaitForFirstConsumer {
+		return isCorrectNode(annotations, nodeName, "kubevirt.io/provisionOnNode") ||
+			isCorrectNode(annotations, nodeName, "volume.kubernetes.io/selected-node")
+	}
+	return isCorrectNode(annotations, nodeName, "kubevirt.io/provisionOnNode")
+}
+
+func isCorrectNode(annotations map[string]string, nodeName string, annotationName string) bool {
+	if val, ok := annotations[annotationName]; ok {
+		glog.Infof("claim included %s annotation: %s\n", annotationName, val)
 		if val == nodeName {
-			glog.Infof("matched provisionOnNode: %s with this node: %s\n", val, nodeName)
+			glog.Infof("matched %s: %s with this node: %s\n", annotationName, val, nodeName)
 			return true
 		}
-		glog.Infof("no match for provisionOnNode: %s with this node: %s\n", val, nodeName)
+		glog.Infof("no match for %s: %s with this node: %s\n", annotationName, val, nodeName)
 		return false
 	}
-	glog.Info("missing kubevirt.io/provisionerOnNode annotation, skipping operations for pvc")
+	glog.Infof("missing %s annotation, skipping operations for pvc", annotationName)
 	return false
 }
 
-func (p *hostPathProvisioner) ShouldProvision(pvc *v1.PersistentVolumeClaim) bool {
-	shouldProvision := isCorrectNode(pvc.GetAnnotations(), p.nodeName)
+func (p *hostPathProvisioner) ShouldProvision(pvc *v1.PersistentVolumeClaim, bindingMode *storage.VolumeBindingMode) bool {
+	shouldProvision := isCorrectNodeByBindingMode(pvc.GetAnnotations(), p.nodeName, *bindingMode)
 
 	if shouldProvision {
 		pvCapacity, err := calculatePvCapacity(p.pvDir)
@@ -187,7 +197,7 @@ func (p *hostPathProvisioner) Delete(volume *v1.PersistentVolume) error {
 	if ann != p.identity {
 		return &controller.IgnoredError{Reason: "identity annotation on PV does not match ours"}
 	}
-	if !isCorrectNode(volume.Annotations, p.nodeName) {
+	if !isCorrectNode(volume.Annotations, p.nodeName, "kubevirt.io/provisionOnNode") {
 		return &controller.IgnoredError{Reason: "identity annotation on pvc does not match ours, not deleting PV"}
 	}
 

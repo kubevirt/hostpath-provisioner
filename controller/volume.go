@@ -45,7 +45,7 @@ type Provisioner interface {
 type Qualifier interface {
 	// ShouldProvision returns whether provisioning for the claim should
 	// be attempted.
-	ShouldProvision(*v1.PersistentVolumeClaim) bool
+	ShouldProvision(*v1.PersistentVolumeClaim, *storageapis.VolumeBindingMode) bool
 }
 
 // DeletionGuard is an optional interface implemented by provisioners to determine
