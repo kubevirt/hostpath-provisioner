@@ -18,6 +18,7 @@ supplementalGroups:
   type: RunAsAny
 allowHostDirVolumePlugin: true
 users:
-- system:serviceaccount:hostpath-provisioner:hostpath-provisioner-admin
+- system:serviceaccount:kubevirt-hostpath-provisioner:kubevirt-hostpath-provisioner-admin
 volumes:
 - hostPath
+- secret
