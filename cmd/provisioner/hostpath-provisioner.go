@@ -92,11 +92,12 @@ var _ controller.Provisioner = &hostPathProvisioner{}
 
 func isCorrectNodeByBindingMode(annotations map[string]string, nodeName string, bindingMode storage.VolumeBindingMode) bool {
 	glog.Infof("isCorrectNodeByBindingMode mode: %s", string(bindingMode))
-	if bindingMode == storage.VolumeBindingWaitForFirstConsumer {
-		return isCorrectNode(annotations, nodeName, "kubevirt.io/provisionOnNode") ||
-			isCorrectNode(annotations, nodeName, "volume.kubernetes.io/selected-node")
+	if _, ok := annotations["kubevirt.io/provisionOnNode"]; ok {
+		return isCorrectNode(annotations, nodeName, "kubevirt.io/provisionOnNode")
+	} else if bindingMode == storage.VolumeBindingWaitForFirstConsumer {
+		return isCorrectNode(annotations, nodeName, "volume.kubernetes.io/selected-node")
 	}
-	return isCorrectNode(annotations, nodeName, "kubevirt.io/provisionOnNode")
+	return false
 }
 
 func isCorrectNode(annotations map[string]string, nodeName string, annotationName string) bool {
