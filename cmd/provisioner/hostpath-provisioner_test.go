@@ -17,10 +17,11 @@ limitations under the License.
 package main
 
 import (
-	"golang.org/x/sys/unix"
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"golang.org/x/sys/unix"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -89,6 +90,8 @@ func Test_isCorrectNode(t *testing.T) {
 }
 
 func Test_isCorrectNodeByBindingMode(t *testing.T) {
+	multiAnnotation := getKubevirtNodeAnnotation("test-node")
+	multiAnnotation["volume.kubernetes.io/selected-node"] = "other-nodex"
 	type args struct {
 		annotations map[string]string
 		nodeName    string
@@ -149,6 +152,24 @@ func Test_isCorrectNodeByBindingMode(t *testing.T) {
 			args: args{
 				annotations: getSelectedNodeAnnotation(""),
 				nodeName:    "test-node",
+				bindingMode: storage.VolumeBindingWaitForFirstConsumer,
+			},
+			want: false,
+		},
+		{
+			name: "passes with precendence to kubevirt annotation over kubernetes annotation",
+			args: args{
+				annotations: multiAnnotation,
+				nodeName:    "test-node",
+				bindingMode: storage.VolumeBindingWaitForFirstConsumer,
+			},
+			want: true,
+		},
+		{
+			name: "passes with precendence to kubevirt annotation over kubernetes annotation",
+			args: args{
+				annotations: multiAnnotation,
+				nodeName:    "other-node",
 				bindingMode: storage.VolumeBindingWaitForFirstConsumer,
 			},
 			want: false,
