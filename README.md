@@ -22,5 +22,5 @@ The provisioner is deployed as a daemonset, and instance of the provisioner is d
 In order to deploy this provisioner in OpenShift you will need to supply the correct SecurityContextConstraints. A minimal needed one is supplied in the [deploy](./deploy) directory. You will also have to create the appropriate selinux rules to allow the pod to write to the path on the host. Our examples use /var/hpvolumes as the path on the host, if you have modified the path change it for this command as well.
 
 ```bash
-$ sudo chcon -R unconfined_u:object_r:svirt_sandbox_file_t:s0 /var/hpvolumes
+$ sudo chcon -t container_file_t -R /var/hpvolumes
 ```
