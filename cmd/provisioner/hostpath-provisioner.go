@@ -40,6 +40,7 @@ import (
 
 const (
 	defaultProvisionerName = "kubevirt.io/hostpath-provisioner"
+	annStorageProvisioner  = "volume.beta.kubernetes.io/storage-provisioner"
 )
 
 var provisionerName string
@@ -93,7 +94,11 @@ var _ controller.Provisioner = &hostPathProvisioner{}
 func isCorrectNodeByBindingMode(annotations map[string]string, nodeName string, bindingMode storage.VolumeBindingMode) bool {
 	glog.Infof("isCorrectNodeByBindingMode mode: %s", string(bindingMode))
 	if _, ok := annotations["kubevirt.io/provisionOnNode"]; ok {
-		return isCorrectNode(annotations, nodeName, "kubevirt.io/provisionOnNode")
+		if isCorrectNode(annotations, nodeName, "kubevirt.io/provisionOnNode") {
+			annotations[annStorageProvisioner] = defaultProvisionerName
+			return true
+		}
+		return false
 	} else if bindingMode == storage.VolumeBindingWaitForFirstConsumer {
 		return isCorrectNode(annotations, nodeName, "volume.kubernetes.io/selected-node")
 	}

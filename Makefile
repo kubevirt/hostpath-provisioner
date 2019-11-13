@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE?=hostpath-provisioner
+.PHONY: cluster-up cluster-down cluster-sync cluster-clean
+
+HPP_IMAGE?=hostpath-provisioner
 TAG?=latest
 DOCKER_REPO?=kubevirt
 
-all: dep controller hostpath-provisioner
-
-dep:
-	dep check  # use `dep ensure -add xxxxx` for any missing packages
+all: controller hostpath-provisioner
 
 controller:
 	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' controller
@@ -28,16 +27,31 @@ hostpath-provisioner: controller
 	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o _out/hostpath-provisioner cmd/provisioner/hostpath-provisioner.go
 
 image: hostpath-provisioner
-	docker build -t $(DOCKER_REPO)/$(IMAGE):$(TAG) -f Dockerfile .
+	docker build -t $(DOCKER_REPO)/$(HPP_IMAGE):$(TAG) -f Dockerfile .
 
 push: hostpath-provisioner image
-	docker push $(DOCKER_REPO)/$(IMAGE):$(TAG)
+	docker push $(DOCKER_REPO)/$(HPP_IMAGE):$(TAG)
 
 clean:
 	rm -rf _out
 
 build: clean dep controller hostpath-provisioner
 
+cluster-up:
+	./cluster-up/up.sh
+
+cluster-down: 
+	./cluster-up/down.sh
+
+cluster-sync: cluster-clean
+	./cluster-sync/sync.sh
+
+cluster-clean:
+	./cluster-sync/clean.sh
+
 test:
-	go test -v ./...
+	go test -v ./cmd/... ./controller/...
 	hack/run-lint-checks.sh
+
+test-functional:
+	go test -v ./tests/... -master="" -kubeconfig="../_ci-configs/k8s-1.15.1/.kubeconfig"
