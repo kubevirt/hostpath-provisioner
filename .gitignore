@@ -4,3 +4,4 @@ _out/*
 hostpath-provisioner
 cmd/provisioner/provisioner
 .project
+_ci-configs/*
