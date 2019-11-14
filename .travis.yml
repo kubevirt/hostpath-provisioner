@@ -25,9 +25,7 @@ deploy:
     repo: kubevirt/hostpath-provisioner
 # Release versioned images
 - provider: script
-  env:
-    - TAG=$TRAVIS_TAG
-  script: make push
+  script: TAG=$TRAVIS_TAG make push
   branches:
     only: /v[0-9]+\.[0-9]+\.[0-9]+(-alpha\.[0-9]+){0,1}/
   on:
