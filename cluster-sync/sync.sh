@@ -24,6 +24,48 @@ DOCKER_REPO=${registry} make push
 
 _kubectl create -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/namespace.yaml
 _kubectl create -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/operator.yaml -n hostpath-provisioner
+# Remove deployment
+_kubectl delete deployment hostpath-provisioner-operator -n hostpath-provisioner --ignore-not-found
+# Redeploy with the correct image name.
+  cat <<EOF | _kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hostpath-provisioner-operator
+  namespace: hostpath-provisioner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: hostpath-provisioner-operator
+  template:
+    metadata:
+      labels:
+        name: hostpath-provisioner-operator
+    spec:
+      serviceAccountName: hostpath-provisioner-operator
+      containers:
+        - name: hostpath-provisioner-operator
+          # Replace this with the built image name
+          image: quay.io/kubevirt/hostpath-provisioner-operator:latest
+          command:
+          - hostpath-provisioner-operator
+          imagePullPolicy: Always
+          env:
+            - name: WATCH_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "hostpath-provisioner-operator"
+            - name: PROVISIONER_IMAGE
+              value: "registry:5000/hostpath-provisioner"
+EOF
+
   cat <<EOF | _kubectl apply -f -
 apiVersion: hostpathprovisioner.kubevirt.io/v1alpha1
 kind: HostPathProvisioner
@@ -31,12 +73,11 @@ metadata:
   name: hostpath-provisioner
 spec:
   imagePullPolicy: Always
-  imageRegistry: registry:5000
-  imageTag: latest
   pathConfig:
     path: "/var/hpvolumes"
     useNamingPrefix: "false"
 EOF
+_kubectl create -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/storageclass-wffc.yaml
 
 echo "Waiting for hostpath provisioner to be available"
 _kubectl wait hostpathprovisioners.hostpathprovisioner.kubevirt.io/hostpath-provisioner --for=condition=Available --timeout=480s
