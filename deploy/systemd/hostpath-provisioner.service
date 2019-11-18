@@ -1,0 +1,9 @@
+[Unit]
+Description=Set SELinux chcon for hostpath-provisioner
+Before=kubelet.service
+
+[Service]
+ExecStart=/usr/bin/chcon -Rt container_file_t /var/hpvolumes
+
+[Install]
+WantedBy=multi-user.target

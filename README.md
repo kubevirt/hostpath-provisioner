@@ -24,3 +24,6 @@ In order to deploy this provisioner in OpenShift you will need to supply the cor
 ```bash
 $ sudo chcon -t container_file_t -R /var/hpvolumes
 ```
+
+### Systemd
+If you are running worker nodes that are running systemd, we have provided a [service file](deploy/systemd/hostpath-provisioner.service) that you can install in /etc/systemd/system/hostpath-provisioner.service to have it set the SElinux labeling at start-up
