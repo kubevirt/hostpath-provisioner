@@ -17,6 +17,7 @@
 HPP_IMAGE?=hostpath-provisioner
 TAG?=latest
 DOCKER_REPO?=kubevirt
+ARTIFACTS_PATH?=_out
 
 all: controller hostpath-provisioner
 
@@ -54,4 +55,4 @@ test:
 	hack/run-lint-checks.sh
 
 test-functional:
-	go test -v ./tests/... -master="" -kubeconfig="../_ci-configs/k8s-1.15.1/.kubeconfig"
+	gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -master="" -kubeconfig="../_ci-configs/k8s-1.15.1/.kubeconfig"
