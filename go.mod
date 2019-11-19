@@ -23,6 +23,7 @@ require (
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/appengine v1.6.5 // indirect
 	gopkg.in/yaml.v2 v2.2.5 // indirect
+	gotest.tools/gotestsum v0.4.0 // indirect
 	k8s.io/api v0.0.0-20191112020540-7f9008e52f64
 	k8s.io/apimachinery v0.0.0-20191111054156-6eb29fdf75dc
 	k8s.io/client-go v0.0.0-20191112100811-dac3b9c76aa0
