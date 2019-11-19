@@ -15,6 +15,7 @@
 # limitations under the License.
 
 set -e
+readonly ARTIFACTS_PATH="${ARTIFACTS}"
 export KUBEVIRT_NUM_NODES=2
 export KUBEVIRT_PROVIDER=k8s-1.15.1
 make cluster-down
@@ -24,5 +25,6 @@ tar -xzf go1.13.3.linux-amd64.tar.gz
 export GOROOT=$PWD/go
 export PATH=$GOROOT/bin:$PATH
 echo $PATH
+go get gotest.tools/gotestsum
 make cluster-sync
 make test-functional
