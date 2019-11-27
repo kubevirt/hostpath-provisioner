@@ -123,8 +123,13 @@ func (p *hostPathProvisioner) ShouldProvision(pvc *v1.PersistentVolumeClaim, bin
 	shouldProvision := isCorrectNodeByBindingMode(pvc.GetAnnotations(), p.nodeName, *bindingMode)
 
 	if shouldProvision {
+		needCapacity := pvc.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+		if needCapacity.IsZero() {
+			glog.Error("PVC request size is zero")
+			return false
+		}
 		pvCapacity, err := calculatePvCapacity(p.pvDir)
-		if pvCapacity != nil && pvCapacity.Cmp(pvc.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]) < 0 {
+		if pvCapacity != nil && pvCapacity.Cmp(needCapacity) < 0 {
 			glog.Error("PVC request size larger than total possible PV size")
 			shouldProvision = false
 		} else if err != nil {
@@ -138,48 +143,45 @@ func (p *hostPathProvisioner) ShouldProvision(pvc *v1.PersistentVolumeClaim, bin
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *hostPathProvisioner) Provision(options controller.ProvisionOptions) (*v1.PersistentVolume, error) {
 	vPath := path.Join(p.pvDir, options.PVName)
-	pvCapacity, err := calculatePvCapacity(p.pvDir)
 	if p.useNamingPrefix {
 		vPath = path.Join(p.pvDir, options.PVC.Name+"-"+options.PVName)
 	}
 
-	if pvCapacity != nil {
-		glog.Infof("creating backing directory: %v", vPath)
+	glog.Infof("creating backing directory: %v", vPath)
 
-		if err := os.MkdirAll(vPath, 0777); err != nil {
-			return nil, err
-		}
-
-		pv := &v1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: options.PVName,
-				Annotations: map[string]string{
-					"hostPathProvisionerIdentity": p.identity,
-					"kubevirt.io/provisionOnNode": p.nodeName,
+	if err := os.MkdirAll(vPath, 0777); err != nil {
+		return nil, err
+	}
+	needCapacity := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: options.PVName,
+			Annotations: map[string]string{
+				"hostPathProvisionerIdentity": p.identity,
+				"kubevirt.io/provisionOnNode": p.nodeName,
+			},
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+			AccessModes:                   (*options.PVC).Spec.AccessModes,
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): needCapacity,
+			},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: vPath,
 				},
 			},
-			Spec: v1.PersistentVolumeSpec{
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				AccessModes:                   options.PVC.Spec.AccessModes,
-				Capacity: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): *pvCapacity,
-				},
-				PersistentVolumeSource: v1.PersistentVolumeSource{
-					HostPath: &v1.HostPathVolumeSource{
-						Path: vPath,
-					},
-				},
-				NodeAffinity: &v1.VolumeNodeAffinity{
-					Required: &v1.NodeSelector{
-						NodeSelectorTerms: []v1.NodeSelectorTerm{
-							{
-								MatchExpressions: []v1.NodeSelectorRequirement{
-									{
-										Key:      "kubernetes.io/hostname",
-										Operator: v1.NodeSelectorOpIn,
-										Values: []string{
-											p.nodeName,
-										},
+			NodeAffinity: &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "kubernetes.io/hostname",
+									Operator: v1.NodeSelectorOpIn,
+									Values: []string{
+										p.nodeName,
 									},
 								},
 							},
@@ -187,10 +189,10 @@ func (p *hostPathProvisioner) Provision(options controller.ProvisionOptions) (*v
 					},
 				},
 			},
-		}
-		return pv, nil
+		},
 	}
-	return nil, err
+	return pv, nil
+
 }
 
 // Delete removes the storage asset that was created by Provision represented
@@ -223,7 +225,7 @@ func calculatePvCapacity(path string) (*resource.Quantity, error) {
 		return nil, err
 	}
 	// Capacity is total block count * block size
-	quantity := resource.NewQuantity(int64(roundDownCapacityPretty(int64(statfs.Blocks)*statfs.Bsize)), resource.BinarySI)
+	quantity := resource.NewQuantity(int64(roundDownCapacityPretty(int64(statfs.Blocks)*int64(statfs.Bsize))), resource.BinarySI)
 	return quantity, nil
 }
 
