@@ -22,10 +22,49 @@ source ./cluster-up/cluster/${KUBEVIRT_PROVIDER}/provider.sh
 registry=${IMAGE_REGISTRY:-localhost:$(_port registry)}
 DOCKER_REPO=${registry} make push
 
-_kubectl create -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/namespace.yaml
-_kubectl create -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/operator.yaml -n hostpath-provisioner
+if [ ! -z $UPGRADE_FROM ]; then
+  _kubectl apply -f https://github.com/kubevirt/hostpath-provisioner-operator/releases/download/$UPGRADE_FROM/namespace.yaml
+  _kubectl apply -f https://github.com/kubevirt/hostpath-provisioner-operator/releases/download/$UPGRADE_FROM/operator.yaml -n hostpath-provisioner
+  cat <<EOF | _kubectl apply -f -
+apiVersion: hostpathprovisioner.kubevirt.io/v1alpha1
+kind: HostPathProvisioner
+metadata:
+  name: hostpath-provisioner
+spec:
+  imagePullPolicy: Always
+  imageRegistry: quay.io/kubevirt
+  imageTag: $UPGRADE_FROM
+  pathConfig:
+    path: "/var/hpvolumes"
+    useNamingPrefix: "false"
+EOF
+  _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/$UPGRADE_FROM/deploy/storageclass-wffc.yaml
+  #Wait for it to be available.
+  _kubectl wait hostpathprovisioners.hostpathprovisioner.kubevirt.io/hostpath-provisioner --for=condition=Available --timeout=480s
+
+  retry_counter=0
+  while [[ $retry_counter -lt 10 ]] && [ "$observed_version" != "$UPGRADE_FROM" ]; do
+    observed_version=`_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.observedVersion}{"\n"}'`
+    target_version=`_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.targetVersion}{"\n"}'`
+    operator_version=`_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.operatorVersion}{"\n"}'`
+    echo "observedVersion: $observed_version, operatorVersion: $operator_version, targetVersion: $target_version"
+    retry_counter=$((retry_counter + 1))
+  sleep 5
+  done
+  if [ $retry_counter -eq 10 ]; then
+	echo "Unable to deploy to version $UPGRADE_FROM"
+	hpp_obj=$(_kubectl get Hostpathprovisioner -o yaml)
+	echo $hpp_obj
+	exit 1
+  fi
+
+fi
+
+_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/namespace.yaml
+_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/operator.yaml -n hostpath-provisioner
+
 # Remove deployment
-_kubectl delete deployment hostpath-provisioner-operator -n hostpath-provisioner --ignore-not-found
+#_kubectl delete deployment hostpath-provisioner-operator -n hostpath-provisioner --ignore-not-found
 # Redeploy with the correct image name.
   cat <<EOF | _kubectl apply -f -
 apiVersion: apps/v1
@@ -77,7 +116,25 @@ spec:
     path: "/var/hpvolumes"
     useNamingPrefix: "false"
 EOF
-_kubectl create -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/storageclass-wffc.yaml
+
+_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/storageclass-wffc.yaml
+
 
 echo "Waiting for hostpath provisioner to be available"
 _kubectl wait hostpathprovisioners.hostpathprovisioner.kubevirt.io/hostpath-provisioner --for=condition=Available --timeout=480s
+
+retry_counter=0
+while [[ $retry_counter -lt 10 ]] && [ "$observed_version" == "$UPGRADE_FROM" ]; do
+  observed_version=`_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.observedVersion}{"\n"}'`
+  target_version=`_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.targetVersion}{"\n"}'`
+  operator_version=`_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.operatorVersion}{"\n"}'`
+  echo "observedVersion: $observed_version, operatorVersion: $operator_version, targetVersion: $target_version"
+  retry_counter=$((retry_counter + 1))
+sleep 5
+done
+if [ $retry_counter -eq 10 ]; then
+echo "Unable to deploy to latest version"
+hpp_obj=$(_kubectl get Hostpathprovisioner -o yaml)
+echo $hpp_obj
+exit 1
+fi
