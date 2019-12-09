@@ -26,5 +26,8 @@ export GOROOT=$PWD/go
 export PATH=$GOROOT/bin:$PATH
 echo $PATH
 go get gotest.tools/gotestsum
+export UPGRADE_FROM=$(curl -s https://github.com/kubevirt/hostpath-provisioner-operator/releases/latest | grep -o "v[0-9]\.[0-9]*\.[0-9]*")
+echo "Upgrading from verions: $UPGRADE_FROM"
+
 make cluster-sync
 make test-functional
