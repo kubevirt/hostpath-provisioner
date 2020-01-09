@@ -52,7 +52,7 @@ metadata:
   name: kubevirt-hostpath-provisioner-admin
   namespace: kubevirt-hostpath-provisioner
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: kubevirt-hostpath-provisioner
