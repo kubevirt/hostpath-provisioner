@@ -160,7 +160,9 @@ func (p *hostPathProvisioner) Provision(options controller.ProvisionOptions) (*v
 			},
 			Spec: v1.PersistentVolumeSpec{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				AccessModes:                   options.PVC.Spec.AccessModes,
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+				},
 				Capacity: v1.ResourceList{
 					v1.ResourceName(v1.ResourceStorage): *pvCapacity,
 				},
