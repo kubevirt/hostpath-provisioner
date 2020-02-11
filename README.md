@@ -14,6 +14,8 @@ The main differences between this provisioner and the standard hostpath provisio
 3. Or if you do not want to specify the node on the claim, you can specify `volumeBindingMode: WaitForFirstConsumer` in the storage class. Then the PV will be created only when the first Pod using this PVC is scheduled. The PV will be created on the node that the Pod is scheduled on.
 Still, the annotation `kubevirt.io/provisionOnNode` can be used in this mode, though it will not wait for the first consumer.
 
+_In cases where multiple PVCs are to be used with a Pod it is not recommended to mix the WaitForFirstConsumer binding mode with the provisionOnNode annotation. All of a Pod's PVCs should carry the annotation or none should. Mixing modes can result in PVCs being allocated from different nodes leaving your Pod unschedulable._
+
 ## Deployment
 
 The provisioner is deployed as a daemonset, and instance of the provisioner is deployed to each of the worker nodes in the kubernetes cluster. We then disable the use of leader election so that any provisioning request is issues to all of the provisioners in the cluster. Each provisioner then evaluates the provision request based on the Node attribute by filtering out any requests that don't match the Node name for the provisioner pod. In case of `WaitForFirstConsumer` binding mode, the provision request is ignored by all the provisioners until a consumer (Pod) is scheduled. Then, an annotation `volume.kubernetes.io/selected-node` containing the node name where the pod is scheduled on, will be added to the PVC. The provisioners will check if the annotation matches the node it runs on, and only if there is a match the PV will be created.
