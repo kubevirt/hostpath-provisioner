@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER:-"k8s-1.15.1"}
+KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER:-"k8s-1.17.0"}
 
 source ./cluster-up/hack/common.sh
 source ./cluster-up/cluster/${KUBEVIRT_PROVIDER}/provider.sh
@@ -132,7 +132,7 @@ while [[ $retry_counter -lt 10 ]] && [ "$observed_version" == "$UPGRADE_FROM" ];
   retry_counter=$((retry_counter + 1))
 sleep 5
 done
-if [ $retry_counter -eq 10 ]; then
+if [ $retry_counter -eq 20 ]; then
 echo "Unable to deploy to latest version"
 hpp_obj=$(_kubectl get Hostpathprovisioner -o yaml)
 echo $hpp_obj
