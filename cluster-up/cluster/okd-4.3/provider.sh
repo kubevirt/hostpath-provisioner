@@ -33,7 +33,7 @@ function up() {
         workers=1
     fi
     echo "Number of workers: $workers"
-    params="--random-ports --background --prefix $provider_prefix --master-cpu 6 --workers-cpu 6 --workers-memory 8192 --secondary-nics ${KUBEVIRT_NUM_SECONDARY_NICS} --registry-volume $(_registry_volume) --workers $workers kubevirtci/${image}"
+    params="--random-ports --background --prefix $provider_prefix --master-cpu 6 --workers-cpu 6 --secondary-nics ${KUBEVIRT_NUM_SECONDARY_NICS} --registry-volume $(_registry_volume) --workers $workers kubevirtci/${image}"
     if [[ ! -z "${RHEL_NFS_DIR}" ]]; then
         params=" --nfs-data $RHEL_NFS_DIR ${params}"
     fi
@@ -53,13 +53,12 @@ function up() {
 
     ${_cli} run okd ${params}
 
-
+    # Copy k8s config and kubectl
     if [ "$KUBEVIRTCI_RUNTIME" = "podman" ]; then
         cluster_container_id=$(pack8s -p "$provider_prefix-cluster" show -i)
     else
         cluster_container_id=$(docker ps -f "name=$provider_prefix-cluster" --format "{{.ID}}")
     fi
-    # Copy k8s config and kubectl
 
     _install_from_cluster $cluster_container_id /usr/local/bin/oc 0755 .kubectl $pack8s_path
     _install_from_cluster $cluster_container_id /root/install/auth/kubeconfig 0644 .kubeconfig $pack8s_path

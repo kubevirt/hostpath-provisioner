@@ -9,7 +9,7 @@ fi
 
 
 source ${KUBEVIRTCI_PATH}hack/common.sh
-source ${KUBEVIRTCI_PATH}cluster/$KUBEVIRT_PROVIDER/provider.sh
+source ${KUBEVIRTCI_CLUSTER_PATH}/$KUBEVIRT_PROVIDER/provider.sh
 up
 
 # check if the environment has a corrupted host
@@ -17,4 +17,3 @@ if [[ $(${KUBEVIRTCI_PATH}kubectl.sh get nodes | grep localhost) != "" ]]; then
     echo "The environment has a corrupted host"
     exit 1
 fi
-

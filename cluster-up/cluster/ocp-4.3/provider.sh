@@ -13,21 +13,15 @@ function _install_from_cluster() {
     local src_cid="$1"
     local src_file="$2"
     local dst_perms="$3"
-    local dst_name="$4"
     local dst_file="${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/$4"
-    local pack8s_path="$5"
 
-    if [ "$KUBEVIRTCI_RUNTIME" = "podman" ]; then
-        pack8s exec $src_cid cp $src_file /tmp/$dst_name
-        cp $pack8s_path/$dst_name $dst_file
-    else
-        touch $dst_file
-        docker exec $src_cid cat $src_file > $dst_file
-    fi
+    touch $dst_file
     chmod $dst_perms $dst_file
+    docker exec $src_cid cat $src_file > $dst_file
 }
 
 function up() {
+    container_registry="quay.io"
     workers=$(($KUBEVIRT_NUM_NODES-1))
     if [[ ( $workers < 1 ) ]]; then
         workers=1
@@ -46,28 +40,31 @@ function up() {
         params=" --installer-pull-secret-file ${INSTALLER_PULL_SECRET} ${params}"
     fi
 
-    if [ "$KUBEVIRTCI_RUNTIME" = "podman" ]; then
-        pack8s_path=$(mktemp -d /tmp/pack8sXXX)
-        params=" --volume $pack8s_path:/tmp ${params}"
-    fi
+    # The auth has the format base64(user:password)
+    auth=$(cat ~/.docker/config.json  | docker run --rm -i imega/jq:1.6 -r '.auths["'$container_registry'"]["auth"]' |base64 -d)
+    user=$(echo $auth |awk -F: '{print $1}')
+    password=$(echo $auth |awk -F: '{print $2}')
 
-    ${_cli} run okd ${params}
-
-
-    if [ "$KUBEVIRTCI_RUNTIME" = "podman" ]; then
-        cluster_container_id=$(pack8s -p "$provider_prefix-cluster" show -i)
+    # If provision test mode is on, use local image
+    if [ -z $KUBEVIRTCI_PROVISION_CHECK ]; then
+        params=" --container-registry ${container_registry} $params"
     else
-        cluster_container_id=$(docker ps -f "name=$provider_prefix-cluster" --format "{{.ID}}")
+        params=" --container-registry= $params"
     fi
-    # Copy k8s config and kubectl
 
-    _install_from_cluster $cluster_container_id /usr/local/bin/oc 0755 .kubectl $pack8s_path
-    _install_from_cluster $cluster_container_id /root/install/auth/kubeconfig 0644 .kubeconfig $pack8s_path
+    ${_cli} run okd ${params} --container-registry-user $user --container-registry-password $password
+
+    # Copy k8s config and kubectl
+    cluster_container_id=$(docker ps -f "name=$provider_prefix-cluster" --format "{{.ID}}")
+
+    _install_from_cluster $cluster_container_id /usr/local/bin/oc 0755 .kubectl
+    _install_from_cluster $cluster_container_id /root/install/auth/kubeconfig 0644 .kubeconfig
 
     # Set server and disable tls check
     export KUBECONFIG=${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubeconfig
     ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl config set-cluster test-1 --server=https://$(_main_ip):$(_port k8s)
     ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl config set-cluster test-1 --insecure-skip-tls-verify=true
+
 
     # Make sure that local config is correct
     prepare_config

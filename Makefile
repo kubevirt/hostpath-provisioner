@@ -55,4 +55,4 @@ test:
 	hack/run-lint-checks.sh
 
 test-functional:
-	gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -master="" -kubeconfig="../_ci-configs/k8s-1.15.1/.kubeconfig"
+	gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -master="" -kubeconfig="../_ci-configs/k8s-1.17.0/.kubeconfig"
