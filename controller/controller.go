@@ -31,7 +31,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/time/rate"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	storagebeta "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -170,6 +170,9 @@ type ProvisionController struct {
 	claimsInProgress sync.Map
 
 	volumeStore VolumeStore
+
+	// True if we have already warned the user about the volume bind mode
+	bindingModewarned bool
 }
 
 const (
@@ -1226,6 +1229,16 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	if err != nil {
 		glog.Error(logOperation(operation, "error getting claim's StorageClass's fields: %v", err))
 		return ProvisioningFinished, err
+	}
+	if class.VolumeBindingMode != nil && *class.VolumeBindingMode == storage.VolumeBindingImmediate {
+		if !ctrl.bindingModewarned {
+			// Notify user the mode is deprecated, and they should use WaitForFirstConsumer
+			glog.Warning("************************************************************************************************************")
+			glog.Warningf("Storage class %s has Immediate volumeBinding mode, this mode is DEPRECATED, please use WaitForFirstConsumer", class.Name)
+			glog.Warning("************************************************************************************************************")
+			// Not worried about concurrency here, worst case scenario we print multiple messages.
+			ctrl.bindingModewarned = true
+		}
 	}
 	if !ctrl.knownProvisioner(class.Provisioner) {
 		// class.Provisioner has either changed since shouldProvision() or
