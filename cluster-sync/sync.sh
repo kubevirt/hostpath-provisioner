@@ -36,7 +36,7 @@ spec:
   imageTag: $UPGRADE_FROM
   pathConfig:
     path: "/var/hpvolumes"
-    useNamingPrefix: false
+    useNamingPrefix: "false"
 EOF
   _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/$UPGRADE_FROM/deploy/storageclass-wffc.yaml
   #Wait for it to be available.
@@ -114,7 +114,7 @@ spec:
   imagePullPolicy: Always
   pathConfig:
     path: "/var/hpvolumes"
-    useNamingPrefix: false
+    useNamingPrefix: "false"
 EOF
 
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/storageclass-wffc.yaml
