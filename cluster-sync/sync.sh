@@ -14,10 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER:-"k8s-1.17.0"}
+KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER:-"k8s-1.18"}
+KUBEVIRT_NUM_NODES=${KUBEVIRT_NUM_NODES:-1}
 
 source ./cluster-up/hack/common.sh
 source ./cluster-up/cluster/${KUBEVIRT_PROVIDER}/provider.sh
+
+for i in $(seq 1 ${KUBEVIRT_NUM_NODES}); do
+    ./cluster-up/ssh.sh "node$(printf "%02d" ${i})" "sudo mkdir -p /var/hpvolumes"
+    ./cluster-up/ssh.sh "node$(printf "%02d" ${i})" "sudo chcon -t container_file_t -R /var/hpvolumes"
+done
 
 registry=${IMAGE_REGISTRY:-localhost:$(_port registry)}
 DOCKER_REPO=${registry} make push

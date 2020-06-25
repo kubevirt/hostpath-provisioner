@@ -14,6 +14,7 @@
 
 .PHONY: cluster-up cluster-down cluster-sync cluster-clean
 
+KUBEVIRT_PROVIDER?=k8s-1.18
 HPP_IMAGE?=hostpath-provisioner
 TAG?=latest
 DOCKER_REPO?=kubevirt
@@ -55,4 +56,4 @@ test:
 	hack/run-lint-checks.sh
 
 test-functional:
-	gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -master="" -kubeconfig="../_ci-configs/k8s-1.17.0/.kubeconfig"
+	gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -master="" -kubeconfig="../_ci-configs/$(KUBEVIRT_PROVIDER)/.kubeconfig"
