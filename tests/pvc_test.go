@@ -1,12 +1,14 @@
 package tests
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -20,7 +22,7 @@ func TestCreatePVCOnNode1(t *testing.T) {
 	annotations := make(map[string]string)
 	annotations["kubevirt.io/provisionOnNode"] = nodes.Items[0].Name
 
-	pvc := createPVCDef(ns.Name, "hostpath-provisioner", annotations)
+	pvc := createPVCDef(ns.Name, "hostpath-provisioner-immediate", annotations)
 	defer func() {
 		// Cleanup
 		if pvc != nil {
@@ -43,10 +45,15 @@ func TestCreatePVCOnNode1(t *testing.T) {
 	pvs, err := k8sClient.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
 	Expect(err).ToNot(HaveOccurred())
 	hostpathPVs := getHostpathPVs(pvs.Items)
-	Expect(pvc.Spec.VolumeName).To(Equal(hostpathPVs[0].Name))
-
-	Expect(hostpathPVs[0].Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal("kubernetes.io/hostname"))
-	Expect(hostpathPVs[0].Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).To(Equal(nodes.Items[0].Name))
+	found := false
+	for _, pv := range hostpathPVs {
+		if pvc.Spec.VolumeName == pv.Name {
+			found = true
+			Expect(pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal("kubernetes.io/hostname"))
+			Expect(pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).To(Equal(nodes.Items[0].Name))
+		}
+	}
+	Expect(found).To(BeTrue())
 }
 
 func TestCreatePVCWaitForConsumer(t *testing.T) {
@@ -99,6 +106,58 @@ func TestCreatePVCWaitForConsumer(t *testing.T) {
 		}
 	}()
 	Expect(pvc.Status.Phase).To(Equal(corev1.ClaimBound))
+}
+
+func TestPVCSize(t *testing.T) {
+	RegisterTestingT(t)
+	tearDown, ns, k8sClient := setupTestCaseNs(t)
+	defer tearDown(t)
+	nodes, err := getAllNodes(k8sClient)
+	Expect(err).ToNot(HaveOccurred())
+	annotations := make(map[string]string)
+	annotations["kubevirt.io/provisionOnNode"] = nodes.Items[0].Name
+
+	pvc := createPVCDef(ns.Name, "hostpath-provisioner-immediate", annotations)
+	defer func() {
+		// Cleanup
+		if pvc != nil {
+			t.Logf("Removing PVC: %s", pvc.Name)
+			err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(pvc.Name, &metav1.DeleteOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		}
+	}()
+
+	dfString, err := RunGoCLICommand("../cluster-up/ssh.sh", "node01", "df -Bk /var/hpvolumes | sed 1d")
+	Expect(err).ToNot(HaveOccurred())
+	sizeQuantity := resource.MustParse(strings.ToLower(strings.Fields(dfString)[1]))
+	int64Size, _ := sizeQuantity.AsInt64()
+	hostQuantity := resource.NewQuantity(int64(roundDownCapacityPretty(int64Size)), resource.BinarySI)
+	t.Logf("Reported size on host: %s", hostQuantity.String())
+
+	t.Logf("Creating PVC: %s", pvc.Name)
+	pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(pvc)
+	Expect(err).ToNot(HaveOccurred())
+
+	Eventually(func() corev1.PersistentVolumeClaimPhase {
+		pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Get(pvc.Name, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		return pvc.Status.Phase
+	}, 90*time.Second, 1*time.Second).Should(BeEquivalentTo(corev1.ClaimBound))
+
+	pvs, err := k8sClient.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+	Expect(err).ToNot(HaveOccurred())
+	hostpathPVs := getHostpathPVs(pvs.Items)
+
+	found := false
+	for _, pv := range hostpathPVs {
+		if pvc.Spec.VolumeName == pv.Name {
+			found = true
+			pvQuantity := pv.Spec.Capacity[v1.ResourceStorage]
+			Expect(pvQuantity.Cmp(*hostQuantity)).To(Equal(0))
+		}
+	}
+	Expect(found).To(BeTrue())
+
 }
 
 func createPVCDef(namespace, storageClassName string, annotations map[string]string) *corev1.PersistentVolumeClaim {

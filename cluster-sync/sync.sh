@@ -125,6 +125,15 @@ EOF
 
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/storageclass-wffc.yaml
 
+cat <<EOF | _kubectl apply -f -
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: hostpath-provisioner-immediate
+provisioner: kubevirt.io/hostpath-provisioner
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+EOF
 
 echo "Waiting for hostpath provisioner to be available"
 _kubectl wait hostpathprovisioners.hostpathprovisioner.kubevirt.io/hostpath-provisioner --for=condition=Available --timeout=480s
