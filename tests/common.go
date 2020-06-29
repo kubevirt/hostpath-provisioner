@@ -1,7 +1,13 @@
 package tests
 
 import (
+	"bufio"
+	"bytes"
 	"flag"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -18,6 +24,14 @@ var (
 	kubectlPath = flag.String("kubectl-path", "kubectl", "The path to the kubectl binary")
 	kubeConfig  = flag.String("kubeconfig", "/var/run/kubernetes/admin.kubeconfig", "The absolute path to the kubeconfig file")
 	master      = flag.String("master", "", "master url:port")
+)
+
+// Common allocation units
+const (
+	KiB int64 = 1024
+	MiB int64 = 1024 * KiB
+	GiB int64 = 1024 * MiB
+	TiB int64 = 1024 * GiB
 )
 
 func setupTestCase(t *testing.T) (func(*testing.T), *kubernetes.Clientset) {
@@ -75,4 +89,56 @@ func getKubeClientFromRESTConfig(config *rest.Config) (*kubernetes.Clientset, er
 	config.APIPath = "/apis"
 	config.ContentType = runtime.ContentTypeJSON
 	return kubernetes.NewForConfig(config)
+}
+
+// RunGoCLICommand executes gocli with given args
+func RunGoCLICommand(cliPath string, args ...string) (string, error) {
+	var outBuf, errBuf bytes.Buffer
+	cmd := exec.Command(cliPath, args...)
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
+
+	err := cmd.Run()
+	if err != nil {
+		wd, _ := os.Getwd()
+		fmt.Fprintf(os.Stderr, "Working dir: %s\n", wd)
+		fmt.Fprintf(os.Stderr, "GoCLI standard output\n%s\n", outBuf.String())
+		fmt.Fprintf(os.Stderr, "GoCLI error output\n%s\n", errBuf.String())
+		return "", err
+	}
+
+	capture := false
+	returnBuf := bytes.NewBuffer(nil)
+	scanner := bufio.NewScanner(&outBuf)
+	for scanner.Scan() {
+		t := scanner.Text()
+		if !capture {
+			if strings.Contains(t, "Connected to tcp://192.168.66.") {
+				capture = true
+			}
+			continue
+		}
+		_, err = returnBuf.Write([]byte(t))
+		if err != nil {
+			return "", err
+		}
+	}
+	return returnBuf.String(), nil
+}
+
+// Round down the capacity to an easy to read value. Blatantly stolen from here: https://github.com/kubernetes-incubator/external-storage/blob/master/local-volume/provisioner/pkg/discovery/discovery.go#L339
+func roundDownCapacityPretty(capacityBytes int64) int64 {
+
+	easyToReadUnitsBytes := []int64{GiB, MiB}
+
+	// Round down to the nearest easy to read unit
+	// such that there are at least 10 units at that size.
+	for _, easyToReadUnitBytes := range easyToReadUnitsBytes {
+		// Round down the capacity to the nearest unit.
+		size := capacityBytes / easyToReadUnitBytes
+		if size >= 10 {
+			return size * easyToReadUnitBytes
+		}
+	}
+	return capacityBytes
 }
