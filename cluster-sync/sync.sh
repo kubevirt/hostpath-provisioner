@@ -144,3 +144,17 @@ hpp_obj=$(_kubectl get Hostpathprovisioner -o yaml)
 echo $hpp_obj
 exit 1
 fi
+
+function check_structural_schema {
+  for crd in "$@"; do
+    status=$(_kubectl get crd $crd -o jsonpath={.status.conditions[?\(@.type==\"NonStructuralSchema\"\)].status})
+    if [ "$status" == "True" ]; then
+      echo "ERROR CRD $crd is not a structural schema!, please fix"
+      _kubectl get crd $crd -o yaml
+      exit 1
+    fi
+    echo "CRD $crd is a StructuralSchema"
+  done
+}
+
+check_structural_schema "hostpathprovisioners.hostpathprovisioner.kubevirt.io"
