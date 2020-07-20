@@ -5,7 +5,7 @@ env:
 language: go
 go_import_path: kubevirt.io/hostpath-provisioner
 go:
-- 1.11.5
+- 1.13.1
 before_install:
 - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 - make test
