@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -27,22 +28,22 @@ func TestCreatePVCOnNode1(t *testing.T) {
 		// Cleanup
 		if pvc != nil {
 			t.Logf("Removing PVC: %s", pvc.Name)
-			err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(pvc.Name, &metav1.DeleteOptions{})
+			err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		}
 	}()
 
 	t.Logf("Creating PVC: %s", pvc.Name)
-	pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(pvc)
+	pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	Eventually(func() corev1.PersistentVolumeClaimPhase {
-		pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Get(pvc.Name, metav1.GetOptions{})
+		pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		return pvc.Status.Phase
 	}, 90*time.Second, 1*time.Second).Should(BeEquivalentTo(corev1.ClaimBound))
 
-	pvs, err := k8sClient.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+	pvs, err := k8sClient.CoreV1().PersistentVolumes().List(context.TODO(), metav1.ListOptions{})
 	Expect(err).ToNot(HaveOccurred())
 	hostpathPVs := getHostpathPVs(pvs.Items)
 	found := false
@@ -67,17 +68,17 @@ func TestCreatePVCWaitForConsumer(t *testing.T) {
 		// Cleanup
 		if pvc != nil {
 			t.Logf("Removing PVC: %s", pvc.Name)
-			err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(pvc.Name, &metav1.DeleteOptions{})
+			err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		}
 	}()
 
 	t.Logf("Creating PVC: %s", pvc.Name)
-	pvc, err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(pvc)
+	pvc, err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	Eventually(func() corev1.PersistentVolumeClaimPhase {
-		pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Get(pvc.Name, metav1.GetOptions{})
+		pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		return pvc.Status.Phase
 	}, 90*time.Second, 1*time.Second).Should(BeEquivalentTo(corev1.ClaimPending))
@@ -85,23 +86,23 @@ func TestCreatePVCWaitForConsumer(t *testing.T) {
 	Expect(pvc.Spec.VolumeName).To(BeEmpty())
 
 	pod := createPodUsingPVC(ns.Name, pvc, annotations)
-	pod, err = k8sClient.CoreV1().Pods(ns.Name).Create(pod)
+	pod, err = k8sClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 	Eventually(func() corev1.PodPhase {
-		pod, err = k8sClient.CoreV1().Pods(ns.Name).Get(pod.Name, metav1.GetOptions{})
+		pod, err = k8sClient.CoreV1().Pods(ns.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		return pod.Status.Phase
 	}, 90*time.Second, 1*time.Second).Should(BeEquivalentTo(corev1.PodRunning))
 
 	// Verify that the PVC is now Bound
 	t.Logf("Creating POD %s that uses PVC %s", pod.Name, pvc.Name)
-	pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Get(pvc.Name, metav1.GetOptions{})
+	pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 	defer func() {
 		// Cleanup
 		if pod != nil {
 			t.Logf("Removing Pod: %s", pod.Name)
-			err := k8sClient.CoreV1().Pods(ns.Name).Delete(pod.Name, &metav1.DeleteOptions{})
+			err := k8sClient.CoreV1().Pods(ns.Name).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		}
 	}()
@@ -122,7 +123,7 @@ func TestPVCSize(t *testing.T) {
 		// Cleanup
 		if pvc != nil {
 			t.Logf("Removing PVC: %s", pvc.Name)
-			err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(pvc.Name, &metav1.DeleteOptions{})
+			err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		}
 	}()
@@ -135,16 +136,16 @@ func TestPVCSize(t *testing.T) {
 	t.Logf("Reported size on host: %s", hostQuantity.String())
 
 	t.Logf("Creating PVC: %s", pvc.Name)
-	pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(pvc)
+	pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	Eventually(func() corev1.PersistentVolumeClaimPhase {
-		pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Get(pvc.Name, metav1.GetOptions{})
+		pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		return pvc.Status.Phase
 	}, 90*time.Second, 1*time.Second).Should(BeEquivalentTo(corev1.ClaimBound))
 
-	pvs, err := k8sClient.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+	pvs, err := k8sClient.CoreV1().PersistentVolumes().List(context.TODO(), metav1.ListOptions{})
 	Expect(err).ToNot(HaveOccurred())
 	hostpathPVs := getHostpathPVs(pvs.Items)
 

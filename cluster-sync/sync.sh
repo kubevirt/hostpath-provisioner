@@ -32,7 +32,7 @@ if [ ! -z $UPGRADE_FROM ]; then
   _kubectl apply -f https://github.com/kubevirt/hostpath-provisioner-operator/releases/download/$UPGRADE_FROM/namespace.yaml
   _kubectl apply -f https://github.com/kubevirt/hostpath-provisioner-operator/releases/download/$UPGRADE_FROM/operator.yaml -n hostpath-provisioner
   cat <<EOF | _kubectl apply -f -
-apiVersion: hostpathprovisioner.kubevirt.io/v1alpha1
+apiVersion: hostpathprovisioner.kubevirt.io/v1beta1
 kind: HostPathProvisioner
 metadata:
   name: hostpath-provisioner
@@ -42,7 +42,7 @@ spec:
   imageTag: $UPGRADE_FROM
   pathConfig:
     path: "/var/hpvolumes"
-    useNamingPrefix: "false"
+    useNamingPrefix: false
 EOF
   _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/$UPGRADE_FROM/deploy/storageclass-wffc.yaml
   #Wait for it to be available.
@@ -112,7 +112,7 @@ spec:
 EOF
 
   cat <<EOF | _kubectl apply -f -
-apiVersion: hostpathprovisioner.kubevirt.io/v1alpha1
+apiVersion: hostpathprovisioner.kubevirt.io/v1beta1
 kind: HostPathProvisioner
 metadata:
   name: hostpath-provisioner
@@ -120,7 +120,7 @@ spec:
   imagePullPolicy: Always
   pathConfig:
     path: "/var/hpvolumes"
-    useNamingPrefix: "false"
+    useNamingPrefix: false
 EOF
 
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/storageclass-wffc.yaml
