@@ -3,6 +3,7 @@ package tests
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -49,10 +50,10 @@ func setupTestCaseNs(t *testing.T) (func(*testing.T), *corev1.Namespace, *kubern
 	if err != nil {
 		t.Errorf("ERROR, unable to create K8SClient: %v", err)
 	}
-	ns, err := k8sClient.CoreV1().Namespaces().Create(createNamespace())
+	ns, err := k8sClient.CoreV1().Namespaces().Create(context.TODO(), createNamespace(), metav1.CreateOptions{})
 	return func(t *testing.T) {
 		t.Logf("Removing namespace: %s", ns.Name)
-		err := k8sClient.CoreV1().Namespaces().Delete(ns.Name, &metav1.DeleteOptions{})
+		err := k8sClient.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
 		if err != nil {
 			t.Errorf("ERROR, unable to remove namespace: %s, %v", ns.Name, err)
 		}
@@ -71,7 +72,7 @@ func createNamespace() *corev1.Namespace {
 }
 
 func getAllNodes(k8sClient *kubernetes.Clientset) (*corev1.NodeList, error) {
-	return k8sClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	return k8sClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 }
 
 // getKubeClient returns a Kubernetes rest client
@@ -118,6 +119,34 @@ func RunGoCLICommand(cliPath string, args ...string) (string, error) {
 			}
 			continue
 		}
+		_, err = returnBuf.Write([]byte(t))
+		if err != nil {
+			return "", err
+		}
+	}
+	return returnBuf.String(), nil
+}
+
+// RunKubeCtlCommand executes gocli with given args
+func RunKubeCtlCommand(args ...string) (string, error) {
+	var outBuf, errBuf bytes.Buffer
+	cmd := exec.Command("../cluster-up/kubectl.sh", args...)
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
+
+	err := cmd.Run()
+	if err != nil {
+		wd, _ := os.Getwd()
+		fmt.Fprintf(os.Stderr, "Working dir: %s\n", wd)
+		fmt.Fprintf(os.Stderr, "kubectl standard output\n%s\n", outBuf.String())
+		fmt.Fprintf(os.Stderr, "kubectl error output\n%s\n", errBuf.String())
+		return "", err
+	}
+
+	returnBuf := bytes.NewBuffer(nil)
+	scanner := bufio.NewScanner(&outBuf)
+	for scanner.Scan() {
+		t := scanner.Text()
 		_, err = returnBuf.Write([]byte(t))
 		if err != nil {
 			return "", err
