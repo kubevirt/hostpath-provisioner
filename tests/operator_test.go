@@ -45,3 +45,23 @@ func TestOperatorEventsReconcileChange(t *testing.T) {
 		return out
 	}, 90*time.Second, 1*time.Second).Should(ContainSubstring("UpdateResourceSuccess"))
 }
+
+func TestCRDExplainable(t *testing.T) {
+	RegisterTestingT(t)
+
+	// This test doesn't test all the fields exhaustively. It checks the top level, and some others to ensure
+	// the explain works in general.
+	// Test top level fields
+	out, err := RunKubeCtlCommand("explain", "hostpathprovisioner")
+	Expect(err).ToNot(HaveOccurred())
+	Expect(out).To(ContainSubstring("HostPathProvisionerSpec defines the desired state of HostPathProvisioner"))
+	Expect(out).To(ContainSubstring("HostPathProvisionerStatus defines the observed state of HostPathProvisioner"))
+
+	// Test status fields
+	out, err = RunKubeCtlCommand("explain", "hostpathprovisioner.status")
+	Expect(err).ToNot(HaveOccurred())
+	Expect(out).To(ContainSubstring("Conditions contains the current conditions observed by the operator"))
+	Expect(out).To(ContainSubstring("ObservedVersion The observed version of the HostPathProvisioner deployment"))
+	Expect(out).To(ContainSubstring("OperatorVersion The version of the HostPathProvisioner Operator"))
+	Expect(out).To(ContainSubstring("TargetVersion The targeted version of the HostPathProvisioner deployment"))
+}
