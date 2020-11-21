@@ -82,6 +82,10 @@ spec:
                   fieldPath: spec.nodeName
             - name: PV_DIR
               value: /var/hpvolumes
+            # change to override the name of the registered provisioner. 
+            # if this changed the storage class's 'provisioner' also has to be updated.
+            - name: PROVISIONER_NAME
+              value: kubevirt.io/hostpath-provisioner
           volumeMounts:
             - name: pv-volume # root dir where your bind mounts will be on the node
               mountPath: /var/hpvolumes
