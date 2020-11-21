@@ -80,7 +80,12 @@ func NewHostPathProvisioner() controller.Provisioner {
 		useNamingPrefix = true
 	}
 	glog.Infof("initiating kubevirt/hostpath-provisioner on node: %s\n", nodeName)
-	provisionerName = "kubevirt.io/hostpath-provisioner"
+
+	// try to get provisioner name from env var, otherwise use default
+	provisionerName = os.Getenv("PROVISIONER_NAME")
+	if provisionerName == "" {
+		provisionerName = defaultProvisionerName
+	}
 	return &hostPathProvisioner{
 		pvDir:           pvDir,
 		identity:        provisionerName,
@@ -91,11 +96,11 @@ func NewHostPathProvisioner() controller.Provisioner {
 
 var _ controller.Provisioner = &hostPathProvisioner{}
 
-func isCorrectNodeByBindingMode(annotations map[string]string, nodeName string, bindingMode storage.VolumeBindingMode) bool {
+func isCorrectNodeByBindingMode(annotations map[string]string, nodeName string, provisionerName string, bindingMode storage.VolumeBindingMode) bool {
 	glog.Infof("isCorrectNodeByBindingMode mode: %s", string(bindingMode))
 	if _, ok := annotations["kubevirt.io/provisionOnNode"]; ok {
 		if isCorrectNode(annotations, nodeName, "kubevirt.io/provisionOnNode") {
-			annotations[annStorageProvisioner] = defaultProvisionerName
+			annotations[annStorageProvisioner] = provisionerName
 			return true
 		}
 		return false
@@ -120,7 +125,7 @@ func isCorrectNode(annotations map[string]string, nodeName string, annotationNam
 }
 
 func (p *hostPathProvisioner) ShouldProvision(pvc *v1.PersistentVolumeClaim, bindingMode *storage.VolumeBindingMode) bool {
-	shouldProvision := isCorrectNodeByBindingMode(pvc.GetAnnotations(), p.nodeName, *bindingMode)
+	shouldProvision := isCorrectNodeByBindingMode(pvc.GetAnnotations(), p.nodeName, p.identity, *bindingMode)
 
 	if shouldProvision {
 		pvCapacity, err := calculatePvCapacity(p.pvDir)

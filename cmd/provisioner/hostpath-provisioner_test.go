@@ -177,7 +177,7 @@ func Test_isCorrectNodeByBindingMode(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isCorrectNodeByBindingMode(tt.args.annotations, tt.args.nodeName, tt.args.bindingMode); got != tt.want {
+			if got := isCorrectNodeByBindingMode(tt.args.annotations, tt.args.nodeName, defaultProvisionerName, tt.args.bindingMode); got != tt.want {
 				t.Errorf("isCorrectNodeByBindingMode() = %v, want %v", got, tt.want)
 			}
 		})
