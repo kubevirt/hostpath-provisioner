@@ -23,10 +23,10 @@ ARTIFACTS_PATH?=_out
 all: controller hostpath-provisioner
 
 controller:
-	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' controller
+	CGO_ENABLED=0 go build -mod=vendor -a -ldflags '-extldflags "-static"' controller
 
 hostpath-provisioner: controller
-	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o _out/hostpath-provisioner cmd/provisioner/hostpath-provisioner.go
+	CGO_ENABLED=0 go build -mod=vendor -a -ldflags '-extldflags "-static"' -o _out/hostpath-provisioner cmd/provisioner/hostpath-provisioner.go
 
 image: hostpath-provisioner
 	docker build -t $(DOCKER_REPO)/$(HPP_IMAGE):$(TAG) -f Dockerfile .
