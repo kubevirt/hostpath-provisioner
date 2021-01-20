@@ -12,6 +12,7 @@ require (
 	github.com/prometheus/client_golang v1.5.1
 	golang.org/x/net v0.0.0-20191112182307-2180aed22343 // indirect
 	golang.org/x/sys v0.0.0-20200122134326-e047566fdf82
+	golang.org/x/text v0.3.5 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/appengine v1.6.5 // indirect
 	k8s.io/api v0.18.6
