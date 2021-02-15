@@ -10,11 +10,13 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	hostpathprovisioner "kubevirt.io/hostpath-provisioner-operator/pkg/client/clientset/versioned"
 
+	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -180,4 +182,20 @@ func roundDownCapacityPretty(capacityBytes int64) int64 {
 		}
 	}
 	return capacityBytes
+}
+
+// Assure reconcile events occur
+func checkReconcileEventsOccur() {
+	// These events are fired when the reconcile loop makes a change
+	gomega.Eventually(func() string {
+		out, err := RunKubeCtlCommand("describe", "hostpathprovisioner", "hostpath-provisioner")
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		return out
+	}, 90*time.Second, 1*time.Second).Should(gomega.ContainSubstring("UpdateResourceStart"))
+
+	gomega.Eventually(func() string {
+		out, err := RunKubeCtlCommand("describe", "hostpathprovisioner", "hostpath-provisioner")
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		return out
+	}, 90*time.Second, 1*time.Second).Should(gomega.ContainSubstring("UpdateResourceSuccess"))
 }
