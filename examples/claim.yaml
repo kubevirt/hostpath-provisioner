@@ -5,7 +5,7 @@ metadata:
   annotations: 
     kubevirt.io/provisionOnNode: kube-1
 spec:
-  storageClassName: "kubevirt-hpp"
+  storageClassName: "kubevirt-hostpath-provisioner"
   accessModes:
     - ReadWriteOnce
   resources:
