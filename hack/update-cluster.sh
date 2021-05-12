@@ -15,7 +15,7 @@
 #limitations under the License.
 
 # the kubevirtci commit hash to vendor from
-kubevirtci_git_hash=6d367f9294fac944eee6a74e96e90770d15057a7
+kubevirtci_git_hash=2105111303-425f089
 
 # remove previous cluster-up dir entirely before vendoring
 rm -rf cluster-up
@@ -23,3 +23,6 @@ rm -rf cluster-up
 # download and extract the cluster-up dir from a specific hash in kubevirtci
 curl -L https://github.com/kubevirt/kubevirtci/archive/${kubevirtci_git_hash}/kubevirtci.tar.gz | tar xz kubevirtci-${kubevirtci_git_hash}/cluster-up --strip-component 1
 
+# the environment variable KUBEVIRTCI_TAG must be exported and set to the tag which was used to vendor kubevirtci
+# it allows the content to find the right gocli version
+echo "KUBEVIRTCI_TAG=${kubevirtci_git_hash}" >>cluster-up/hack/common.sh

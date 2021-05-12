@@ -2,13 +2,29 @@
 
 set -e
 
-source ${KUBEVIRTCI_PATH}/cluster/images.sh
+KUBEVIRT_WITH_ETC_IN_MEMORY=${KUBEVIRT_WITH_ETC_IN_MEMORY:-false}
+KUBEVIRT_WITH_ETC_CAPACITY=${KUBEVIRT_WITH_ETC_CAPACITY:-none}
+
+if [ -z "${KUBEVIRTCI_TAG}" ] && [ -z "${KUBEVIRTCI_GOCLI_CONTAINER}" ]; then
+    echo "FATAL: either KUBEVIRTCI_TAG or KUBEVIRTCI_GOCLI_CONTAINER must be set"
+    exit 1
+fi
+
+if [ -n "${KUBEVIRTCI_TAG}" ] && [ -n "${KUBEVIRTCI_GOCLI_CONTAINER}" ]; then
+    echo "WARNING: KUBEVIRTCI_GOCLI_CONTAINER is set and will take precedence over the also set KUBEVIRTCI_TAG"
+fi
 
 if [ "${KUBEVIRTCI_RUNTIME}" = "podman" ]; then
     _cli="pack8s"
 else
-    _cli_container="${KUBEVIRTCI_GOCLI_CONTAINER:-kubevirtci/${IMAGES[gocli]}}"
-    _cli="docker run --privileged --net=host --rm ${USE_TTY} -v /var/run/docker.sock:/var/run/docker.sock ${_cli_container}"
+    _cli_container="${KUBEVIRTCI_GOCLI_CONTAINER:-quay.io/kubevirtci/gocli:${KUBEVIRTCI_TAG}}"
+    _cli="docker run --privileged --net=host --rm ${USE_TTY} -v /var/run/docker.sock:/var/run/docker.sock"
+    # gocli will try to mount /lib/modules to make it accessible to dnsmasq in
+    # in case it exists
+    if [ -d /lib/modules ]; then
+        _cli="${_cli} -v /lib/modules/:/lib/modules/"
+    fi
+    _cli="${_cli} ${_cli_container}"
 fi
 
 function _main_ip() {
@@ -36,15 +52,31 @@ function _registry_volume() {
 }
 
 function _add_common_params() {
-    local params="--nodes ${KUBEVIRT_NUM_NODES} --memory ${KUBEVIRT_MEMORY_SIZE} --cpu 6 --secondary-nics ${KUBEVIRT_NUM_SECONDARY_NICS} --random-ports --background --prefix $provider_prefix --registry-volume $(_registry_volume) kubevirtci/${image} ${KUBEVIRT_PROVIDER_EXTRA_ARGS}"
+    local params="--nodes ${KUBEVIRT_NUM_NODES} --memory ${KUBEVIRT_MEMORY_SIZE} --cpu 6 --secondary-nics ${KUBEVIRT_NUM_SECONDARY_NICS} --random-ports --background --prefix $provider_prefix --registry-volume $(_registry_volume) ${KUBEVIRT_PROVIDER} ${KUBEVIRT_PROVIDER_EXTRA_ARGS}"
     if [[ $TARGET =~ windows.* ]] && [ -n "$WINDOWS_NFS_DIR" ]; then
         params=" --nfs-data $WINDOWS_NFS_DIR $params"
     elif [[ $TARGET =~ os-.* ]] && [ -n "$RHEL_NFS_DIR" ]; then
         params=" --nfs-data $RHEL_NFS_DIR $params"
     fi
     if [ -n "${KUBEVIRTCI_PROVISION_CHECK}" ]; then
-        params=" --container-registry= $params"
+        params=" --container-registry=quay.io --container-suffix=:latest $params"
     fi
+
+    if [ $KUBEVIRT_WITH_ETC_IN_MEMORY == "true" ]; then
+        params=" --run-etcd-on-memory $params"
+        if [ $KUBEVIRT_WITH_ETC_CAPACITY != "none" ]; then
+          params=" --etcd-capacity $KUBEVIRT_WITH_ETC_CAPACITY $params"
+        fi
+    fi
+    if [ $KUBEVIRT_DEPLOY_ISTIO == "true" ]; then
+       params=" --enable-istio $params"
+    fi
+
+    # alternate (new) way to specify storage providers
+    if [[ $KUBEVIRT_STORAGE == "rook-ceph-default" ]] && [[ $KUBEVIRT_PROVIDER_EXTRA_ARGS != *"--enable-ceph"* ]]; then
+        params=" --enable-ceph $params"
+    fi
+
     echo $params
 }
 
