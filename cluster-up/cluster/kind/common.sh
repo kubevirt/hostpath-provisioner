@@ -2,6 +2,24 @@
 
 set -e
 
+# check CPU arch
+PLATFORM=$(uname -m)
+case ${PLATFORM} in
+x86_64* | i?86_64* | amd64*)
+    ARCH="amd64"
+    ;;
+ppc64le)
+    ARCH="ppc64le"
+    ;;
+aarch64* | arm64*)
+    ARCH="arm64"
+    ;;
+*)
+    echo "invalid Arch, only support x86_64, ppc64le, aarch64"
+    exit 1
+    ;;
+esac
+
 NODE_CMD="docker exec -it -d "
 export KIND_MANIFESTS_DIR="${KUBEVIRTCI_PATH}/cluster/kind/manifests"
 export KIND_NODE_CLI="docker exec -it "
@@ -14,6 +32,9 @@ REGISTRY_NAME=${CLUSTER_NAME}-registry
 
 MASTER_NODES_PATTERN="control-plane"
 WORKER_NODES_PATTERN="worker"
+
+KUBEVIRT_WITH_KIND_ETCD_IN_MEMORY=${KUBEVIRT_WITH_KIND_ETCD_IN_MEMORY:-"true"}
+ETCD_IN_MEMORY_DATA_DIR="/tmp/kind-cluster-etcd"
 
 function _wait_kind_up {
     echo "Waiting for kind to be ready ..."
@@ -31,11 +52,13 @@ function _wait_containers_ready {
 }
 
 function _fetch_kind() {
-    if [ ! -f ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kind ]; then
-        wget https://github.com/kubernetes-sigs/kind/releases/download/v0.7.0/kind-linux-amd64 -O ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kind
-        chmod +x ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kind
+    KIND="${KUBEVIRTCI_CONFIG_PATH}"/"$KUBEVIRT_PROVIDER"/.kind
+    current_kind_version=$($KIND --version |& awk '{print $3}')
+    if [[ $current_kind_version != $KIND_VERSION ]]; then
+        echo "Downloading kind v$KIND_VERSION"
+        curl -LSs https://github.com/kubernetes-sigs/kind/releases/download/v$KIND_VERSION/kind-linux-${ARCH} -o "$KIND"
+        chmod +x "$KIND"
     fi
-    KIND=${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kind
 }
 
 function _configure-insecure-registry-and-reload() {
@@ -63,7 +86,7 @@ function _run_registry() {
         docker rm $REGISTRY_NAME || true
         sleep 5
     done
-    docker run -d -p 5000:5000 --restart=always --name $REGISTRY_NAME registry:2
+    docker run -d -p $HOST_PORT:5000 --restart=always --name $REGISTRY_NAME registry:2
 }
 
 function _configure_registry_on_node() {
@@ -71,17 +94,42 @@ function _configure_registry_on_node() {
     ${NODE_CMD} $1  sh -c "echo $(docker inspect --format '{{.NetworkSettings.IPAddress }}' $REGISTRY_NAME)'\t'registry >> /etc/hosts"
 }
 
+function _install_cnis {
+    _install_cni_plugins
+    _install_calico_cni
+}
+
+function _install_cni_plugins {
+    local CNI_VERSION="v0.8.5"
+    local CNI_ARCHIVE="cni-plugins-linux-${ARCH}-$CNI_VERSION.tgz"
+    local CNI_URL="https://github.com/containernetworking/plugins/releases/download/$CNI_VERSION/$CNI_ARCHIVE"
+    if [ ! -f ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/$CNI_ARCHIVE ]; then
+        echo "Downloading $CNI_ARCHIVE"
+        curl -sSL -o ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/$CNI_ARCHIVE $CNI_URL
+    fi
+
+    for node in $(_get_nodes | awk '{print $1}'); do
+        docker cp "${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/$CNI_ARCHIVE" $node:/
+        docker exec $node /bin/sh -c "tar xf $CNI_ARCHIVE -C /opt/cni/bin"
+    done
+}
+
+function _install_calico_cni {
+    echo "Installing Calico CNI plugin"
+    calico_manifest="$KIND_MANIFESTS_DIR/kube-calico.yaml.in"
+    patched_diff=$(_patch_calico_manifest_diff $calico_manifest)
+    echo "Log Calico manifest diff:"
+    echo "$patched_diff"
+    _patch_calico_manifest "$calico_manifest" "$patched_diff" | _kubectl apply -f -
+}
+
 function prepare_config() {
     BASE_PATH=${KUBEVIRTCI_CONFIG_PATH:-$PWD}
     cat >$BASE_PATH/$KUBEVIRT_PROVIDER/config-provider-$KUBEVIRT_PROVIDER.sh <<EOF
-if [ -z ${IPV6_CNI+x} ]; then
-    master_ip="127.0.0.1"
-else
-    master_ip="::1"
-fi
+master_ip="127.0.0.1"
 kubeconfig=${BASE_PATH}/$KUBEVIRT_PROVIDER/.kubeconfig
 kubectl=${BASE_PATH}/$KUBEVIRT_PROVIDER/.kubectl
-docker_prefix=localhost:5000/kubevirt
+docker_prefix=localhost:${HOST_PORT}/kubevirt
 manifest_docker_prefix=registry:5000/kubevirt
 EOF
 }
@@ -92,24 +140,6 @@ function _configure_network() {
     ${NODE_CMD} $1 modprobe br_netfilter
     for knob in arp ip ip6; do
         ${NODE_CMD} $1 sysctl -w sys.net.bridge.bridge-nf-call-${knob}tables=1
-    done
-}
-
-function prepare_workers() {
-    # appending eventual workers to the yaml
-    for ((n=0;n<$(($KUBEVIRT_NUM_NODES-1));n++)); do
-        cat << EOF >> ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/kind.yaml
-- role: worker
-  kubeadmConfigPatches:
-  - |
-    kind: JoinConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        "feature-gates": "CPUManager=true"
-        "cpu-manager-policy": "static"
-        "kube-reserved": "cpu=500m"
-        "system-reserved": "cpu=500m"
-EOF
     done
 }
 
@@ -141,26 +171,53 @@ function _fix_node_labels() {
     done
 }
 
+function _get_cri_bridge_mtu() {
+  docker network inspect -f '{{index .Options "com.docker.network.driver.mtu"}}' bridge
+}
+
+function _patch_calico_manifest_diff() {
+  local -r calico_manifest="$1"
+  local -r calico_diff="$KIND_MANIFESTS_DIR/kube-calico.diff.in"
+
+  local -r cri_mtu=$(_get_cri_bridge_mtu)
+  local -r ipip_mode=$(sed -n '/name:.*CALICO_IPV4POOL_IPIP.*/{n; s/.*value:.*\(Always\|Never\).*/\1/p}' $calico_manifest)
+  if [ $ipip_mode == "Always" ]; then
+    overhead=$((20))
+    calico_mtu=$((cri_mtu - overhead))
+  else
+    calico_mtu=$( sed -n 's/.*veth_mtu:.*\([[:digit:]]\{4,5\}\).*/\1/p' $calico_manifest)
+  fi
+
+  # Substitute MTU placeholder with the calculated MTU
+  CNI_MTU=$calico_mtu envsubst < $calico_diff
+}
+
+function _patch_calico_manifest() {
+  local -r calico_manifest="$1"
+  local -r diff_string="$2"
+  
+  patch $calico_manifest -o - <<< "$diff_string"
+}
+
 function setup_kind() {
     $KIND --loglevel debug create cluster --retain --name=${CLUSTER_NAME} --config=${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/kind.yaml --image=$KIND_NODE_IMAGE
     $KIND get kubeconfig --name=${CLUSTER_NAME} > ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubeconfig
 
-    docker cp ${CLUSTER_NAME}-control-plane:/kind/bin/kubectl ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl
+    docker cp ${CLUSTER_NAME}-control-plane:$KUBECTL_PATH ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl
     chmod u+x ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl
 
-    for node in $(_get_nodes | awk '{print $1}'); do
-        docker exec $node /bin/sh -c "curl -L https://github.com/containernetworking/plugins/releases/download/v0.8.5/cni-plugins-linux-amd64-v0.8.5.tgz | tar xz -C /opt/cni/bin"
-    done
+    if [ $KUBEVIRT_WITH_KIND_ETCD_IN_MEMORY == "true" ]; then
+        for node in $(_get_nodes | awk '{print $1}' | grep control-plane); do
+            echo "[$node] Checking KIND cluster etcd data is mounted to RAM: $ETCD_IN_MEMORY_DATA_DIR"
+            docker exec $node df -h $(dirname $ETCD_IN_MEMORY_DATA_DIR) | grep -P '(tmpfs|ramfs)'
+            [ $(echo $?) != 0 ] && echo "[$node] etcd data directory is not mounted to RAM" && return 1
 
-    echo "ipv6 cni: $IPV6_CNI"
-    if [ -z ${IPV6_CNI+x} ]; then
-        echo "no ipv6, safe to install calico"
-        _kubectl apply -f $KIND_MANIFESTS_DIR/kube-calico.yaml
-    else
-        echo "ipv6 enabled, using kindnet"
-        # currently kind does not fully support ipv6 or ipv6-DualStack,
-        # when using diffrent CNI's.
+            docker exec $node du -h $ETCD_IN_MEMORY_DATA_DIR
+            [ $(echo $?) != 0 ] && echo "[$node] Failed to check etcd data directory" && return 1
+        done
     fi
+
+    _install_cnis
 
     _wait_kind_up
     _kubectl cluster-info
@@ -189,9 +246,71 @@ function setup_kind() {
     prepare_config
 }
 
+function _add_worker_extra_mounts() {
+    if [[ "$KUBEVIRT_PROVIDER" =~ sriov.* ]]; then
+        cat <<EOF >> ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/kind.yaml
+  extraMounts:
+  - containerPath: /lib/modules
+    hostPath: /lib/modules
+    readOnly: true
+  - containerPath: /dev/vfio/
+    hostPath: /dev/vfio/
+EOF
+  fi
+}
+
+function _add_worker_kubeadm_config_patch() {
+    cat << EOF >> ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/kind.yaml
+  kubeadmConfigPatches:
+  - |-
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        "feature-gates": "CPUManager=true"
+        "cpu-manager-policy": "static"
+        "kube-reserved": "cpu=500m"
+        "system-reserved": "cpu=500m"
+EOF
+}
+
+function _add_workers() {
+    # appending eventual workers to the yaml
+    for ((n=0;n<$(($KUBEVIRT_NUM_NODES-1));n++)); do
+        cat << EOF >> ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/kind.yaml
+- role: worker
+EOF
+    _add_worker_kubeadm_config_patch
+    _add_worker_extra_mounts
+    done
+}
+
+function _add_kubeadm_config_patches() {
+    if [ $KUBEVIRT_WITH_KIND_ETCD_IN_MEMORY == "true" ]; then
+        cat <<EOF >> ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/kind.yaml
+kubeadmConfigPatches:
+- |
+  kind: ClusterConfiguration
+  metadata:
+    name: config
+  etcd:
+    local:
+      dataDir: $ETCD_IN_MEMORY_DATA_DIR
+EOF
+        echo "KIND cluster etcd data will be mounted to RAM on kind nodes: $ETCD_IN_MEMORY_DATA_DIR"
+    fi
+}
+
+function _prepare_kind_config() {
+    _add_workers
+    _add_kubeadm_config_patches
+
+    echo "Final KIND config:"
+    cat ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/kind.yaml
+}
+
 function kind_up() {
     _fetch_kind
-    prepare_workers
+    _prepare_kind_config
     setup_kind
 }
 
@@ -201,9 +320,10 @@ function _kubectl() {
 
 function down() {
     _fetch_kind
-    if [ -z $($KIND get clusters | grep ${CLUSTER_NAME}) ]; then
+    if [ -z "$($KIND get clusters | grep ${CLUSTER_NAME})" ]; then
         return
     fi
     $KIND delete cluster --name=${CLUSTER_NAME}
-    rm ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/kind.yaml
+    docker rm -f $REGISTRY_NAME >> /dev/null
+    rm -f ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/kind.yaml
 }

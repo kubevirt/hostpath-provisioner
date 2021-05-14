@@ -1,15 +1,15 @@
-# Kubernetes 1.18 in ephemeral containers
+# Kubernetes 1.20 in ephemeral containers (with cgroups v2)
 
-Provides a pre-deployed Kubernetes with version 1.18 purely in docker
+Provides a pre-deployed Kubernetes with version 1.20 purely in docker
 containers with qemu. The provided VMs are completely ephemeral and are
-recreated on every cluster restart. The KubeVirt containers are built on the
-local machine and are then pushed to a registry which is exposed at
-`localhost:5000`.
+recreated on every cluster restart. The nodes are configured to use cgroups
+v2. The KubeVirt containers are built on the local machine and are then pushed
+to a registry which is exposed at `localhost:5000`.
 
 ## Bringing the cluster up
 
 ```bash
-export KUBEVIRT_PROVIDER=k8s-1.18
+export KUBEVIRT_PROVIDER=k8s-1.20-cgroupsv2
 export KUBEVIRT_NUM_NODES=2 # master + one node
 make cluster-up
 ```
@@ -19,14 +19,14 @@ The cluster can be accessed as usual:
 ```bash
 $ cluster/kubectl.sh get nodes
 NAME      STATUS     ROLES     AGE       VERSION
-node01    NotReady   master    31s       v1.18.1
-node02    NotReady   <none>    5s        v1.18.1
+node01    NotReady   master    31s       v1.20.1
+node02    NotReady   <none>    5s        v1.20.1
 ```
 
 ## Bringing the cluster up with cluster-network-addons-operator provisioned
 
 ```bash
-export KUBEVIRT_PROVIDER=k8s-1.18
+export KUBEVIRT_PROVIDER=k8s-1.20-cgroupsv2
 export KUBEVIRT_NUM_NODES=2 # master + one node
 export KUBEVIRT_WITH_CNAO=true
 make cluster-up
@@ -38,7 +38,7 @@ here https://github.com/kubevirt/cluster-network-addons-operator
 ## Bringing the cluster down
 
 ```bash
-export KUBEVIRT_PROVIDER=k8s-1.18
+export KUBEVIRT_PROVIDER=k8s-1.20-cgroupsv2
 make cluster-down
 ```
 
@@ -67,7 +67,7 @@ has to be enabled on your Docker. Add following to your
     "ipv6": true,
     "fixed-cidr-v6": "2001:db8:1::/64"
 }
-```  
+```
 
 ```bash
 systemctl restart docker

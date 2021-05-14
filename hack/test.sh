@@ -17,7 +17,7 @@
 set -e
 readonly ARTIFACTS_PATH="${ARTIFACTS}"
 export KUBEVIRT_NUM_NODES=2
-export KUBEVIRT_PROVIDER=k8s-1.18
+export KUBEVIRT_PROVIDER=k8s-1.20
 make cluster-down
 make cluster-up
 wget https://dl.google.com/go/go1.13.3.linux-amd64.tar.gz

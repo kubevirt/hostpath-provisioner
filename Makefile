@@ -14,7 +14,7 @@
 
 .PHONY: cluster-up cluster-down cluster-sync cluster-clean
 
-KUBEVIRT_PROVIDER?=k8s-1.18
+KUBEVIRT_PROVIDER?=k8s-1.20
 HPP_IMAGE?=hostpath-provisioner
 TAG?=latest
 DOCKER_REPO?=kubevirt
@@ -40,20 +40,20 @@ clean:
 build: clean dep controller hostpath-provisioner
 
 cluster-up:
-	./cluster-up/up.sh
+	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} ./cluster-up/up.sh
 
 cluster-down: 
-	./cluster-up/down.sh
+	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} ./cluster-up/down.sh
 
 cluster-sync: cluster-clean
-	./cluster-sync/sync.sh
+	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} ./cluster-sync/sync.sh
 
 cluster-clean:
-	./cluster-sync/clean.sh
+	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} ./cluster-sync/clean.sh
 
 test:
 	go test -v ./cmd/... ./controller/...
 	hack/run-lint-checks.sh
 
 test-functional:
-	gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -master="" -kubeconfig="../_ci-configs/$(KUBEVIRT_PROVIDER)/.kubeconfig"
+	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -master="" -kubeconfig="../_ci-configs/$(KUBEVIRT_PROVIDER)/.kubeconfig"
