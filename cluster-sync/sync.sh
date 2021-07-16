@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER:-"k8s-1.18"}
+KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER:-"k8s-1.21"}
 KUBEVIRT_NUM_NODES=${KUBEVIRT_NUM_NODES:-1}
 
 source ./cluster-up/hack/common.sh

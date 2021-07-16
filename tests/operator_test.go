@@ -1,3 +1,18 @@
+/*
+Copyright 2021 The hostpath provisioner Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package tests
 
 import (
@@ -11,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	hostpathprovisioner "kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1"
 )
@@ -33,19 +49,21 @@ func TestReconcileChangeOnDaemonSet(t *testing.T) {
 
 	ds, err := k8sClient.AppsV1().DaemonSets("hostpath-provisioner").Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
-	originalEnvVarValue := ds.Spec.Template.Spec.Containers[0].Env[0].Value
+	originalEnvVarLen := len(ds.Spec.Template.Spec.Containers[0].Env)
 
-	ds.Spec.Template.Spec.Containers[0].Env[0].Value = "true"
+	ds.Spec.Template.Spec.Containers[0].Env = append(ds.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
+		Name: "something",
+		Value: "true",
+	})
 	_, err = k8sClient.AppsV1().DaemonSets("hostpath-provisioner").Update(context.TODO(), ds, metav1.UpdateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
-	checkReconcileEventsOccur()
-
-	// Assure original value is restored
-	// No need to use polling here - we know that reconcile events occured prior to this
-	ds, err = k8sClient.AppsV1().DaemonSets("hostpath-provisioner").Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
-	Expect(err).ToNot(HaveOccurred())
-	Expect(ds.Spec.Template.Spec.Containers[0].Env[0].Value).To(Equal(originalEnvVarValue))
+	Eventually(func() int {
+		// Assure original value is restored
+		ds, err = k8sClient.AppsV1().DaemonSets("hostpath-provisioner").Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		return len(ds.Spec.Template.Spec.Containers[0].Env)
+	}, 2*time.Minute, 1*time.Second).Should(Equal(originalEnvVarLen))
 }
 
 func TestReconcileChangeOnServiceAccount(t *testing.T) {
@@ -73,7 +91,11 @@ func TestReconcileChangeOnClusterRole(t *testing.T) {
 	tearDown, k8sClient := setupTestCase(t)
 	defer tearDown(t)
 
-	cr, err := k8sClient.RbacV1().ClusterRoles().Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
+	roleName := "hostpath-provisioner"
+	if isCSIStorageClass(k8sClient) {
+		roleName = "hostpath-provisioner-admin"
+	}
+	cr, err := k8sClient.RbacV1().ClusterRoles().Get(context.TODO(), roleName, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	// Remove list verb
@@ -97,7 +119,7 @@ func TestReconcileChangeOnClusterRole(t *testing.T) {
 
 	// Assure "list" verb gets restored
 	Eventually(func() []string {
-		cr, err = k8sClient.RbacV1().ClusterRoles().Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
+		cr, err = k8sClient.RbacV1().ClusterRoles().Get(context.TODO(), roleName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		return cr.Rules[0].Verbs
 	}, 2*time.Minute, 1*time.Second).Should(ContainElement("list"))
@@ -108,7 +130,11 @@ func TestReconcileChangeOnClusterRoleBinding(t *testing.T) {
 	tearDown, k8sClient := setupTestCase(t)
 	defer tearDown(t)
 
-	crb, err := k8sClient.RbacV1().ClusterRoleBindings().Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
+	roleName := "hostpath-provisioner"
+	if isCSIStorageClass(k8sClient) {
+		roleName = "hostpath-provisioner-admin"
+	}
+	crb, err := k8sClient.RbacV1().ClusterRoleBindings().Get(context.TODO(), roleName, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	crb.Subjects = []rbacv1.Subject{}
@@ -117,7 +143,7 @@ func TestReconcileChangeOnClusterRoleBinding(t *testing.T) {
 
 	// Assure subjects get repopulated
 	Eventually(func() []rbacv1.Subject {
-		crb, err = k8sClient.RbacV1().ClusterRoleBindings().Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
+		crb, err = k8sClient.RbacV1().ClusterRoleBindings().Get(context.TODO(), roleName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		return crb.Subjects
 	}, 2*time.Minute, 1*time.Second).ShouldNot(BeEmpty())
@@ -236,3 +262,22 @@ func TestNodeSelector(t *testing.T) {
 	}, 90*time.Second, 1*time.Second).Should(BeTrue())
 
 }
+
+func Test_CSIDriver(t *testing.T) {
+	RegisterTestingT(t)
+	tearDown, k8sClient := setupTestCase(t)
+	defer tearDown(t)
+
+	if !isCSIStorageClass(k8sClient) {
+		t.Skip("Not CSI driver")
+	}
+	driver, err := k8sClient.StorageV1().CSIDrivers().Get(context.TODO(), csiProvisionerName, metav1.GetOptions{})
+	Expect(err).ToNot(HaveOccurred())
+	Expect(driver.Name).To(Equal(csiProvisionerName))
+	Expect(driver.Spec.AttachRequired).ToNot(BeNil())
+	Expect(*driver.Spec.AttachRequired).To(BeFalse())
+	Expect(driver.Spec.PodInfoOnMount).ToNot(BeNil())
+	Expect(*driver.Spec.PodInfoOnMount).To(BeTrue())
+	Expect(driver.Spec.VolumeLifecycleModes).To(ContainElement(storagev1.VolumeLifecyclePersistent))
+}
+

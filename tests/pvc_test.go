@@ -1,3 +1,18 @@
+/*
+Copyright 2021 The hostpath provisioner Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package tests
 
 import (
@@ -18,6 +33,11 @@ func TestCreatePVCOnNode1(t *testing.T) {
 	RegisterTestingT(t)
 	tearDown, ns, k8sClient := setupTestCaseNs(t)
 	defer tearDown(t)
+
+	if isCSIStorageClass(k8sClient) {
+		t.Skip("Running CSI client")
+	}
+
 	nodes, err := getAllNodes(k8sClient)
 	Expect(err).ToNot(HaveOccurred())
 	annotations := make(map[string]string)
@@ -88,11 +108,11 @@ func TestCreatePVCWaitForConsumer(t *testing.T) {
 	pod := createPodUsingPVC(ns.Name, pvc, annotations)
 	pod, err = k8sClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred())
-	Eventually(func() corev1.PodPhase {
+	Eventually(func() bool {
 		pod, err = k8sClient.CoreV1().Pods(ns.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
-		return pod.Status.Phase
-	}, 90*time.Second, 1*time.Second).Should(BeEquivalentTo(corev1.PodRunning))
+		return pod.Status.Phase == corev1.PodRunning || pod.Status.Phase == corev1.PodSucceeded
+	}, 90*time.Second, 1*time.Second).Should(BeTrue())
 
 	// Verify that the PVC is now Bound
 	t.Logf("Creating POD %s that uses PVC %s", pod.Name, pvc.Name)
@@ -113,12 +133,9 @@ func TestPVCSize(t *testing.T) {
 	RegisterTestingT(t)
 	tearDown, ns, k8sClient := setupTestCaseNs(t)
 	defer tearDown(t)
-	nodes, err := getAllNodes(k8sClient)
-	Expect(err).ToNot(HaveOccurred())
 	annotations := make(map[string]string)
-	annotations["kubevirt.io/provisionOnNode"] = nodes.Items[0].Name
 
-	pvc := createPVCDef(ns.Name, "hostpath-provisioner-immediate", annotations)
+	pvc := createPVCDef(ns.Name, "hostpath-provisioner", annotations)
 	defer func() {
 		// Cleanup
 		if pvc != nil {
@@ -143,6 +160,23 @@ func TestPVCSize(t *testing.T) {
 		pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		return pvc.Status.Phase
+	}, 90*time.Second, 1*time.Second).Should(BeEquivalentTo(corev1.ClaimPending))
+
+	Expect(pvc.Spec.VolumeName).To(BeEmpty())
+
+	pod := createPodUsingPVC(ns.Name, pvc, annotations)
+	pod, err = k8sClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+	Expect(err).ToNot(HaveOccurred())
+	Eventually(func() bool {
+		pod, err = k8sClient.CoreV1().Pods(ns.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		return pod.Status.Phase == corev1.PodRunning || pod.Status.Phase == corev1.PodSucceeded
+	}, 90*time.Second, 1*time.Second).Should(BeTrue())
+
+	Eventually(func() corev1.PersistentVolumeClaimPhase {
+		pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		return pvc.Status.Phase
 	}, 90*time.Second, 1*time.Second).Should(BeEquivalentTo(corev1.ClaimBound))
 
 	pvs, err := k8sClient.CoreV1().PersistentVolumes().List(context.TODO(), metav1.ListOptions{})
@@ -154,6 +188,7 @@ func TestPVCSize(t *testing.T) {
 		if pvc.Spec.VolumeName == pv.Name {
 			found = true
 			pvQuantity := pv.Spec.Capacity[v1.ResourceStorage]
+			t.Logf("pv: %v, host: %v", pvQuantity, *hostQuantity)
 			Expect(pvQuantity.Cmp(*hostQuantity)).To(Equal(0))
 		}
 	}
@@ -216,7 +251,7 @@ func getHostpathPVs(allPvs []corev1.PersistentVolume) []corev1.PersistentVolume 
 	result := make([]corev1.PersistentVolume, 0)
 	for _, pv := range allPvs {
 		val, ok := pv.GetAnnotations()["pv.kubernetes.io/provisioned-by"]
-		if ok && val == "kubevirt.io/hostpath-provisioner" {
+		if ok && (val == legacyProvisionerName || val == csiProvisionerName) {
 			result = append(result, pv)
 		}
 	}

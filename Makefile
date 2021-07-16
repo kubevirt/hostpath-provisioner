@@ -22,22 +22,32 @@ ARTIFACTS_PATH?=_out
 
 all: controller hostpath-provisioner
 
-controller:
-	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' controller
-
-hostpath-provisioner: controller
+hostpath-provisioner:
 	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o _out/hostpath-provisioner cmd/provisioner/hostpath-provisioner.go
 
-image: hostpath-provisioner
-	docker build -t $(DOCKER_REPO)/$(HPP_IMAGE):$(TAG) -f Dockerfile .
+hostpath-provisioner-plugin:
+	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o _out/hostpath-provisioner-csi cmd/plugin/plugin.go
 
-push: hostpath-provisioner image
+image: image-controller image-csi
+
+push: push-controller push-csi
+
+push-controller: hostpath-provisioner image
 	docker push $(DOCKER_REPO)/$(HPP_IMAGE):$(TAG)
+
+image-controller: hostpath-provisioner
+	docker build -t $(DOCKER_REPO)/$(HPP_IMAGE):$(TAG) -f Dockerfile.controller .
+
+image-csi: hostpath-provisioner-plugin
+	docker build -t $(DOCKER_REPO)/$(HPP_IMAGE)-csi:$(TAG) -f Dockerfile.csi .
+
+push-csi: hostpath-provisioner-plugin image-csi
+	docker push $(DOCKER_REPO)/$(HPP_IMAGE)-csi:$(TAG)
 
 clean:
 	rm -rf _out
 
-build: clean dep controller hostpath-provisioner
+build: clean hostpath-provisioner hostpath-provisioner-csi
 
 cluster-up:
 	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} ./cluster-up/up.sh
@@ -52,8 +62,14 @@ cluster-clean:
 	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} ./cluster-sync/clean.sh
 
 test:
-	go test -v ./cmd/... ./controller/...
+	go test -v ./cmd/... ./controller/... ./pkg/...
 	hack/run-lint-checks.sh
 
 test-functional:
 	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -master="" -kubeconfig="../_ci-configs/$(KUBEVIRT_PROVIDER)/.kubeconfig"
+
+test-sanity:
+	go test -o _out/sanity.test -c -v ./sanity/...
+	docker build -t $(DOCKER_REPO)/sanity:test -f ./sanity/Dockerfile .
+	# Need privileged so we can bind mount inside container, and hostpath capacity cannot change, so skipping that test
+	docker run --privileged $(DOCKER_REPO)/sanity:test -ginkgo.skip="should fail when requesting to create a volume with already existing name and different capacity"
