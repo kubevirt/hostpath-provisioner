@@ -52,6 +52,7 @@ func TestCreatePVCOnNode1(t *testing.T) {
 			found = true
 			Expect(pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal("kubernetes.io/hostname"))
 			Expect(pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).To(Equal(nodes.Items[0].Name))
+			Expect(pv.GetLabels()["app.kubernetes.io/managed-by"]).To(Equal("hostpath-provisioner"))
 		}
 	}
 	Expect(found).To(BeTrue())

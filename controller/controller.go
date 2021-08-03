@@ -55,32 +55,48 @@ import (
 	"sigs.k8s.io/sig-storage-lib-external-provisioner/v6/util"
 )
 
-// annClass annotation represents the storage class associated with a resource:
-// - in PersistentVolumeClaim it represents required class to match.
-//   Only PersistentVolumes with the same class (i.e. annotation with the same
-//   value) can be bound to the claim. In case no such volume exists, the
-//   controller will provision a new one using StorageClass instance with
-//   the same name as the annotation value.
-// - in PersistentVolume it represents storage class to which the persistent
-//   volume belongs.
-const annClass = "volume.beta.kubernetes.io/storage-class"
+const (
+	// annClass annotation represents the storage class associated with a resource:
+	// - in PersistentVolumeClaim it represents required class to match.
+	//   Only PersistentVolumes with the same class (i.e. annotation with the same
+	//   value) can be bound to the claim. In case no such volume exists, the
+	//   controller will provision a new one using StorageClass instance with
+	//   the same name as the annotation value.
+	// - in PersistentVolume it represents storage class to which the persistent
+	//   volume belongs.
+	annClass = "volume.beta.kubernetes.io/storage-class"
 
-// This annotation is added to a PV that has been dynamically provisioned by
-// Kubernetes. Its value is name of volume plugin that created the volume.
-// It serves both user (to show where a PV comes from) and Kubernetes (to
-// recognize dynamically provisioned PVs in its decisions).
-const annDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
+	// This annotation is added to a PV that has been dynamically provisioned by
+	// Kubernetes. Its value is name of volume plugin that created the volume.
+	// It serves both user (to show where a PV comes from) and Kubernetes (to
+	// recognize dynamically provisioned PVs in its decisions).
+	annDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 
-const annStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
+	annStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 
-// This annotation is added to a PVC that has been triggered by scheduler to
-// be dynamically provisioned. Its value is the name of the selected node.
-const annSelectedNode = "volume.kubernetes.io/selected-node"
+	// This annotation is added to a PVC that has been triggered by scheduler to
+	// be dynamically provisioned. Its value is the name of the selected node.
+	annSelectedNode = "volume.kubernetes.io/selected-node"
 
-// Finalizer for PVs so we know to clean them up
-const finalizerPV = "external-provisioner.volume.kubernetes.io/finalizer"
+	// Finalizer for PVs so we know to clean them up
+	finalizerPV = "external-provisioner.volume.kubernetes.io/finalizer"
 
-const uidIndex = "uid"
+	uidIndex = "uid"
+
+	// PartOfLabelEnvVarName is the environment variable name for the part-of label value
+	PartOfLabelEnvVarName = "INSTALLER_PART_OF_LABEL"
+	// VersionLabelEnvVarName is the environment variable name for the version label value
+	VersionLabelEnvVarName = "INSTALLER_VERSION_LABEL"
+
+	// AppKubernetesPartOfLabel is the Kubernetes recommended part-of label
+	AppKubernetesPartOfLabel = "app.kubernetes.io/part-of"
+	// AppKubernetesVersionLabel is the Kubernetes recommended version label
+	AppKubernetesVersionLabel = "app.kubernetes.io/version"
+	// AppKubernetesManagedByLabel is the Kubernetes recommended managed-by label
+	AppKubernetesManagedByLabel = "app.kubernetes.io/managed-by"
+	// AppKubernetesComponentLabel is the Kubernetes recommended component label
+	AppKubernetesComponentLabel = "app.kubernetes.io/component"
+)
 
 // ProvisionController is a controller that provisions PersistentVolumes for
 // PersistentVolumeClaims.
@@ -1463,4 +1479,37 @@ func (ctrl *ProvisionController) supportsBlock() bool {
 		return blockProvisioner.SupportsBlock()
 	}
 	return false
+}
+
+func mergeLabels(src, dest map[string]string) map[string]string {
+	if dest == nil {
+		dest = map[string]string{}
+	}
+
+	for k, v := range src {
+		dest[k] = v
+	}
+
+	return dest
+}
+
+func setRecommendedLabels(obj metav1.Object) {
+	labels := map[string]string{
+		AppKubernetesManagedByLabel: "hostpath-provisioner",
+		AppKubernetesComponentLabel: "storage",
+	}
+
+	// Populate installer labels from env vars
+	partOfLabelVal := os.Getenv(PartOfLabelEnvVarName)
+	if partOfLabelVal != "" {
+		labels[AppKubernetesPartOfLabel] = partOfLabelVal
+	}
+	versionLabelVal := os.Getenv(VersionLabelEnvVarName)
+	if versionLabelVal != "" {
+		labels[AppKubernetesVersionLabel] = versionLabelVal
+	}
+
+	// Merge with existing labels
+	mergedLabels := mergeLabels(labels, obj.GetLabels())
+	obj.SetLabels(mergedLabels)
 }

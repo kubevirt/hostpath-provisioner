@@ -145,6 +145,7 @@ func (q *queueStore) processNextWorkItem() bool {
 }
 
 func (q *queueStore) doSaveVolume(volume *v1.PersistentVolume) error {
+	setRecommendedLabels(volume)
 	klog.V(5).Infof("Saving volume %s", volume.Name)
 	_, err := q.client.CoreV1().PersistentVolumes().Create(context.TODO(), volume, metav1.CreateOptions{})
 	if err == nil || apierrs.IsAlreadyExists(err) {
@@ -184,6 +185,7 @@ func NewBackoffStore(client kubernetes.Interface,
 func (b *backoffStore) StoreVolume(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) error {
 	// Try to create the PV object several times
 	var lastSaveError error
+	setRecommendedLabels(volume)
 	err := wait.ExponentialBackoff(*b.backoff, func() (bool, error) {
 		klog.Infof("Trying to save persistentvolume %q", volume.Name)
 		var err error
