@@ -69,7 +69,4 @@ test-functional:
 	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -master="" -kubeconfig="../_ci-configs/$(KUBEVIRT_PROVIDER)/.kubeconfig"
 
 test-sanity:
-	go test -o _out/sanity.test -c -v ./sanity/...
-	docker build -t $(DOCKER_REPO)/sanity:test -f ./sanity/Dockerfile .
-	# Need privileged so we can bind mount inside container, and hostpath capacity cannot change, so skipping that test
-	docker run --privileged $(DOCKER_REPO)/sanity:test -ginkgo.skip="should fail when requesting to create a volume with already existing name and different capacity"
+	DOCKER_REPO=${DOCKER_REPO} hack/sanity.sh
