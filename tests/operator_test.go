@@ -179,6 +179,7 @@ func TestNodeSelector(t *testing.T) {
 
 	cr, err := hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
+	Expect(cr.Spec.DisableCsi).To(BeTrue())
 
 	nodes, _ := k8sClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	affinityTestValue := &v1.Affinity{
@@ -197,12 +198,12 @@ func TestNodeSelector(t *testing.T) {
 	nodeSelectorTestValue := map[string]string{"kubernetes.io/arch": "not-a-real-architecture"}
 	tolerationsTestValue := []v1.Toleration{{Key: "test", Value: "123"}}
 
-	origWorkloads := cr.Spec.Workloads.DeepCopy()
+	origWorkload := cr.Spec.Workload.DeepCopy()
 	defer func() {
 		cr, err = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		cr.Spec.Workloads = *origWorkloads.DeepCopy()
+		cr.Spec.Workload = *origWorkload.DeepCopy()
 
 		_, err = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Update(context.TODO(), cr, metav1.UpdateOptions{})
 		Expect(err).ToNot(HaveOccurred())
@@ -223,7 +224,7 @@ func TestNodeSelector(t *testing.T) {
 		}, 270*time.Second, 1*time.Second).Should(BeTrue())
 	}()
 
-	cr.Spec.Workloads = hostpathprovisioner.NodePlacement{
+	cr.Spec.Workload = hostpathprovisioner.NodePlacement{
 		NodeSelector: nodeSelectorTestValue,
 		Affinity:     affinityTestValue,
 		Tolerations:  tolerationsTestValue,

@@ -636,7 +636,7 @@ k8s.io/utils/io
 k8s.io/utils/keymutex
 k8s.io/utils/mount
 k8s.io/utils/trace
-# kubevirt.io/hostpath-provisioner-operator v0.8.2
+# kubevirt.io/hostpath-provisioner-operator v0.9.0
 ## explicit
 kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner
 kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1alpha1

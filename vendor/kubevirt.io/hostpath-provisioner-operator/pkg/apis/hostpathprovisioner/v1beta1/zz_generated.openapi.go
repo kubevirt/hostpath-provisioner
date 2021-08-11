@@ -107,6 +107,13 @@ func schema_pkg_apis_hostpathprovisioner_v1beta1_HostPathProvisionerSpec(ref com
 							Ref:         ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.NodePlacement"),
 						},
 					},
+					"disableCsi": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisableCSI Use old in tree based provisioner instead of CSI provisioner, default: false",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"pathConfig"},
 			},

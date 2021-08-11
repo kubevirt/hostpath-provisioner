@@ -14,7 +14,6 @@ require (
 	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	google.golang.org/grpc v1.38.0
-	gotest.tools/gotestsum v1.7.0 // indirect
 	k8s.io/api v0.22.0
 	k8s.io/apimachinery v0.21.2
 	k8s.io/client-go v12.0.0+incompatible
@@ -22,7 +21,7 @@ require (
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/kubernetes v1.21.2
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
-	kubevirt.io/hostpath-provisioner-operator v0.8.2
+	kubevirt.io/hostpath-provisioner-operator v0.9.0
 	sigs.k8s.io/sig-storage-lib-external-provisioner/v6 v6.0.0
 )
 

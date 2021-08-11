@@ -30,7 +30,9 @@ type HostPathProvisionerSpec struct {
 	// PathConfig describes the location and layout of PV storage on nodes
 	PathConfig PathConfig `json:"pathConfig" valid:"required"`
 	// Restrict on which nodes HPP workload pods will be scheduled
-	Workloads NodePlacement `json:"workload,omitempty"`
+	Workload NodePlacement `json:"workload,omitempty"`
+	// DisableCSI Use old in tree based provisioner instead of CSI provisioner, default: false
+	DisableCsi bool `json:"disableCsi,omitempty"`
 }
 
 // HostPathProvisionerStatus defines the observed state of HostPathProvisioner
@@ -56,6 +58,7 @@ type HostPathProvisionerStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
 // +kubebuilder:resource:path=hostpathprovisioners,scope=Cluster
+// +kubebuilder:storageversion
 type HostPathProvisioner struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

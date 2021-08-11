@@ -69,6 +69,21 @@ fi
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/namespace.yaml
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/operator.yaml -n hostpath-provisioner
 
+if [ ! -z $UPGRADE_FROM ]; then
+    echo "upgraded"
+    set +e
+    retry_counter=0
+    ret=1
+    while [[ $retry_counter -lt 10 ]] && [[ $ret -eq 1 ]]; do
+      retry_counter=$((retry_counter + 1))
+      _kubectl explain hostpathprovisioner.spec.disableCsi
+      ret=$?
+      echo "ret ${ret}"
+      sleep 5
+    done
+    set -e
+fi
+echo "disableCsi available"
 # Remove deployment
 #_kubectl delete deployment hostpath-provisioner-operator -n hostpath-provisioner --ignore-not-found
 # Redeploy with the correct image name.
@@ -77,7 +92,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hostpath-provisioner-operator
-  namespace: hostpath-provisioner
 spec:
   replicas: 1
   selector:
@@ -92,7 +106,7 @@ spec:
       containers:
         - name: hostpath-provisioner-operator
           # Replace this with the built image name
-          image: quay.io/kubevirt/hostpath-provisioner-operator:latest
+          image: quay.io/kubevirt/hostpath-provisioner-operator:csi
           command:
           - hostpath-provisioner-operator
           imagePullPolicy: Always
@@ -108,9 +122,21 @@ spec:
             - name: OPERATOR_NAME
               value: "hostpath-provisioner-operator"
             - name: PROVISIONER_IMAGE
-              value: "registry:5000/hostpath-provisioner"
+              value: "registry:5000/hostpath-provisioner:latest"
+            - name: CSI_PROVISIONER_IMAGE
+              value: "registry:5000/hostpath-provisioner-csi:latest"
+            - name: EXTERNAL_HEALTH_MON_IMAGE
+              value: "k8s.gcr.io/sig-storage/csi-external-health-monitor-controller:v0.3.0"
+            - name: NODE_DRIVER_REG_IMAGE
+              value: "k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.2.0"
+            - name: LIVENESS_PROVE_IMAGE
+              value: "k8s.gcr.io/sig-storage/livenessprobe:v2.3.0"
+            - name: CSI_SIG_STORAGE_PROVISIONER_IMAGE
+              value: "k8s.gcr.io/sig-storage/csi-provisioner:v2.2.1"
+            - name: VERBOSITY
+              value: "3"
 EOF
-
+echo "apply disableCsi"
   cat <<EOF | _kubectl apply -f -
 apiVersion: hostpathprovisioner.kubevirt.io/v1beta1
 kind: HostPathProvisioner
@@ -118,6 +144,7 @@ metadata:
   name: hostpath-provisioner
 spec:
   imagePullPolicy: Always
+  disableCsi: true
   pathConfig:
     path: "/var/hpvolumes"
     useNamingPrefix: false

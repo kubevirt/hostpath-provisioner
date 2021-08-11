@@ -9,19 +9,6 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: csi-hostpathplugin-attacher-cluster-role
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: external-attacher-runner
-subjects:
-- kind: ServiceAccount
-  name: csi-hostpath-provisioner-sa
-  namespace: default
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
   name: csi-hostpathplugin-health-monitor-controller-cluster-role
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -44,18 +31,6 @@ subjects:
 - kind: ServiceAccount
   name: csi-hostpath-provisioner-sa
   namespace: default
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: csi-hostpathplugin-attacher-role
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: external-attacher-cfg
-subjects:
-- kind: ServiceAccount
-  name: csi-hostpath-provisioner-sa
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -112,7 +87,7 @@ spec:
             - "--nodeid=$(KUBE_NODE_NAME)"
           env:
             - name: CSI_ENDPOINT
-              value: unix:///csi/csi.sock
+              value: unix://csi/csi.sock
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
@@ -191,20 +166,6 @@ spec:
           args:
           - --csi-address=/csi/csi.sock
           - --health-port=9898
-
-        - name: csi-attacher
-          image: k8s.gcr.io/sig-storage/csi-attacher:v3.2.1
-          args:
-            - --v=3
-            - --csi-address=/csi/csi.sock
-          securityContext:
-            # This is necessary only for systems with SELinux, where
-            # non-privileged sidecar containers cannot access unix domain socket
-            # created by privileged CSI driver container.
-            privileged: true
-          volumeMounts:
-          - mountPath: /csi
-            name: socket-dir
 
         - name: csi-provisioner
           image: k8s.gcr.io/sig-storage/csi-provisioner:v2.2.1
