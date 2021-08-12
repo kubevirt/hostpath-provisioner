@@ -2,7 +2,7 @@ kind: SecurityContextConstraints
 apiVersion: v1
 metadata:
   name: hostpath-provisioner
-allowPrivilegedContainer: false
+allowPrivilegedContainer: true
 requiredDropCapabilities:
 - KILL
 - MKNOD
@@ -16,10 +16,6 @@ fsGroup:
   type: RunAsAny
 supplementalGroups:
   type: RunAsAny
-allowHostDirVolumePlugin: true
+allowHostDirVolumePlugin: false
 users:
 - system:serviceaccount:kubevirt-hostpath-provisioner:kubevirt-hostpath-provisioner-admin
-volumes:
-- hostPath
-- secret
-- projected

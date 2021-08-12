@@ -1,0 +1,12 @@
+apiVersion: hostpathprovisioner.kubevirt.io/v1beta1
+kind: HostPathProvisioner
+metadata:
+  name: hostpath-provisioner
+spec:
+  imagePullPolicy: IfNotPresent
+  pathConfig:
+    path: "/var/hpvolumes"
+    useNamingPrefix: false
+  workload:
+    nodeSelector:
+      kubernetes.io/os: linux

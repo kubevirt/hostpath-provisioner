@@ -79,5 +79,5 @@ echo "KUBE_SSH_USER=${KUBE_SSH_USER}, KEY_FILE=${KUBE_SSH_KEY_PATH}"
 #Download test
 curl --location https://dl.k8s.io/v1.21.0/kubernetes-test-linux-amd64.tar.gz |   tar --strip-components=3 -zxf - kubernetes/test/bin/e2e.test kubernetes/test/bin/ginkgo
 #Run test
-./e2e.test -ginkgo.v -ginkgo.focus='External.Storage' -storage.testdriver=./hack/test-driver.yaml -provider=local
+./e2e.test -ginkgo.v -ginkgo.focus='External.Storage' -ginkgo.skip='immediate binding' -storage.testdriver=./hack/test-driver.yaml -provider=local
 
