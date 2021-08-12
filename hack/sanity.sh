@@ -14,6 +14,15 @@
 #limitations under the License.
 set -e
 DOCKER_REPO=${DOCKER_REPO:-registry:5000}
+
+function finish() {
+  echo "cleaning up"
+  #cleanup
+  rm ./go1.16.7.linux-amd64.tar.gz
+  rm -rf ./go
+}
+trap finish EXIT
+
 wget https://dl.google.com/go/go1.16.7.linux-amd64.tar.gz
 tar -xzf go1.16.7.linux-amd64.tar.gz
 export GOROOT=$PWD/go
