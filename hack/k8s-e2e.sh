@@ -79,5 +79,6 @@ echo "KUBE_SSH_USER=${KUBE_SSH_USER}, KEY_FILE=${KUBE_SSH_KEY_PATH}"
 #Download test
 curl --location https://dl.k8s.io/v1.21.0/kubernetes-test-linux-amd64.tar.gz |   tar --strip-components=3 -zxf - kubernetes/test/bin/e2e.test kubernetes/test/bin/ginkgo
 #Run test
-./e2e.test -ginkgo.v -ginkgo.focus='External.Storage' -ginkgo.skip='immediate binding' -storage.testdriver=./hack/test-driver.yaml -provider=local
+# Some of these tests assume immediate binding, which is a random node, however if multiple volumes are involved sometimes they end up on different nodes and the test fails. Excluding that test.
+./e2e.test -ginkgo.v -ginkgo.focus='External.Storage.*kubevirt.io.hostpath-provisioner' -ginkgo.skip='immediate binding|External.Storage.*should access to two volumes with the same volume mode and retain data across pod recreation on the same node \[LinuxOnly\]' -storage.testdriver=./hack/test-driver.yaml -provider=local
 

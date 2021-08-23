@@ -73,12 +73,33 @@ func (hpc *hostPathController) validateCreateVolumeRequest(req *csi.CreateVolume
 	return nil
 }
 
+func (hpc *hostPathController) validateCreateVolumeRequestTopology(req *csi.CreateVolumeRequest) error {
+	if req.AccessibilityRequirements != nil {
+		for _, requisite := range req.AccessibilityRequirements.Requisite {
+			if requisite.Segments[TopologyKeyNode] == hpc.cfg.NodeID {
+				return nil
+			}
+		}
+		for _, preferred := range req.AccessibilityRequirements.Preferred {
+			if preferred.Segments[TopologyKeyNode] == hpc.cfg.NodeID {
+				return nil
+			}
+		}
+		return status.Error(codes.InvalidArgument, "not correct node")
+	}
+	return nil
+}
+
 func (hpc *hostPathController) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (resp *csi.CreateVolumeResponse, finalErr error) {
 	if req != nil {
 		klog.V(3).Infof("Create Volume Request: %+v", *req)
 	}
 
 	if err := hpc.validateCreateVolumeRequest(req); err != nil {
+		return nil, err
+	}
+
+	if err := hpc.validateCreateVolumeRequestTopology(req); err != nil {
 		return nil, err
 	}
 
