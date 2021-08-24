@@ -84,6 +84,77 @@ func Test_validateCreateVolumeRequest(t *testing.T) {
 	})
 }
 
+func Test_validateCreateVolumeRequestTopology(t *testing.T) {
+	RegisterTestingT(t)
+	controller := createControllerServer("")
+	t.Run("No AccessibilityRequirements", func(t *testing.T){
+		err := controller.validateCreateVolumeRequestTopology(&csi.CreateVolumeRequest{})
+		Expect(err).ToNot(HaveOccurred())
+	})
+	t.Run("No topology", func(t *testing.T){
+		err := controller.validateCreateVolumeRequestTopology(&csi.CreateVolumeRequest{
+			AccessibilityRequirements: &csi.TopologyRequirement{},
+		})
+		Expect(err).To(BeEquivalentTo(status.Error(codes.InvalidArgument, "not correct node")))
+	})	
+	t.Run("Correct requisite topology", func(t *testing.T){
+		err := controller.validateCreateVolumeRequestTopology(&csi.CreateVolumeRequest{
+			AccessibilityRequirements: &csi.TopologyRequirement{
+				Requisite: []*csi.Topology{
+					{
+						Segments: map[string]string {
+							TopologyKeyNode: "test_node",
+						},
+					},
+				},
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+	})	
+	t.Run("Wrong requisite topology", func(t *testing.T){
+		err := controller.validateCreateVolumeRequestTopology(&csi.CreateVolumeRequest{
+			AccessibilityRequirements: &csi.TopologyRequirement{
+				Requisite: []*csi.Topology{
+					{
+						Segments: map[string]string {
+							TopologyKeyNode: "invalid",
+						},
+					},
+				},
+			},
+		})
+		Expect(err).To(BeEquivalentTo(status.Error(codes.InvalidArgument, "not correct node")))
+	})	
+	t.Run("Correct preferred topology", func(t *testing.T){
+		err := controller.validateCreateVolumeRequestTopology(&csi.CreateVolumeRequest{
+			AccessibilityRequirements: &csi.TopologyRequirement{
+				Preferred: []*csi.Topology{
+					{
+						Segments: map[string]string {
+							TopologyKeyNode: "test_node",
+						},
+					},
+				},
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+	})	
+	t.Run("Wrong preferred topology", func(t *testing.T){
+		err := controller.validateCreateVolumeRequestTopology(&csi.CreateVolumeRequest{
+			AccessibilityRequirements: &csi.TopologyRequirement{
+				Preferred: []*csi.Topology{
+					{
+						Segments: map[string]string {
+							TopologyKeyNode: "invalid",
+						},
+					},
+				},
+			},
+		})
+		Expect(err).To(BeEquivalentTo(status.Error(codes.InvalidArgument, "not correct node")))
+	})	
+}
+
 func Test_CreateVolumeInvalidRequest(t *testing.T) {
 	RegisterTestingT(t)
 	controller := createControllerServer("")
