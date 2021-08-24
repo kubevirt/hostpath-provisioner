@@ -16,6 +16,7 @@
 
 KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER:-"k8s-1.21"}
 KUBEVIRT_NUM_NODES=${KUBEVIRT_NUM_NODES:-1}
+HPP_NAMESPACE=${HPP_NAMESPACE:-"hostpath-provisioner"}
 
 source ./cluster-up/hack/common.sh
 source ./cluster-up/cluster/${KUBEVIRT_PROVIDER}/provider.sh
@@ -30,7 +31,7 @@ DOCKER_REPO=${registry} make push
 
 if [ ! -z $UPGRADE_FROM ]; then
   _kubectl apply -f https://github.com/kubevirt/hostpath-provisioner-operator/releases/download/$UPGRADE_FROM/namespace.yaml
-  _kubectl apply -f https://github.com/kubevirt/hostpath-provisioner-operator/releases/download/$UPGRADE_FROM/operator.yaml -n hostpath-provisioner
+  _kubectl apply -f https://github.com/kubevirt/hostpath-provisioner-operator/releases/download/$UPGRADE_FROM/operator.yaml -n ${HPP_NAMESPACE}
   cat <<EOF | _kubectl apply -f -
 apiVersion: hostpathprovisioner.kubevirt.io/v1beta1
 kind: HostPathProvisioner
@@ -66,8 +67,10 @@ EOF
 
 fi
 
+if [ ${HPP_NAMESPACE} == "hostpath-provisioner" ]; then
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/namespace.yaml
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/operator.yaml -n hostpath-provisioner
+fi
+_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/operator.yaml -n ${HPP_NAMESPACE}
 
 if [ ! -z $UPGRADE_FROM ]; then
     echo "upgraded"
@@ -92,6 +95,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hostpath-provisioner-operator
+  namespace: ${HPP_NAMESPACE}
 spec:
   replicas: 1
   selector:
@@ -149,7 +153,6 @@ spec:
     path: "/var/hpvolumes"
     useNamingPrefix: false
 EOF
-
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/storageclass-wffc.yaml
 
 cat <<EOF | _kubectl apply -f -
@@ -161,7 +164,6 @@ provisioner: kubevirt.io/hostpath-provisioner
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
 EOF
-
 echo "Waiting for hostpath provisioner to be available"
 _kubectl wait hostpathprovisioners.hostpathprovisioner.kubevirt.io/hostpath-provisioner --for=condition=Available --timeout=480s
 
@@ -176,7 +178,7 @@ sleep 5
 done
 if [ $retry_counter -eq 20 ]; then
 echo "Unable to deploy to latest version"
-hpp_obj=$(_kubectl get Hostpathprovisioner -o yaml)
+hpp_obj=$(_kubectl get hostpathprovisioner -o yaml)
 echo $hpp_obj
 exit 1
 fi
@@ -192,5 +194,4 @@ function check_structural_schema {
     echo "CRD $crd is a StructuralSchema"
   done
 }
-
 check_structural_schema "hostpathprovisioners.hostpathprovisioner.kubevirt.io"
