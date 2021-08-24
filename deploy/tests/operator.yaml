@@ -1871,7 +1871,7 @@ spec:
       containers:
         - name: hostpath-provisioner-operator
           # Replace this with the built image name
-          image: registry:5000/hostpath-provisioner-operator:csi
+          image: quay.io/kubevirt/hostpath-provisioner-operator:csi
           command:
           - hostpath-provisioner-operator
           imagePullPolicy: Always
