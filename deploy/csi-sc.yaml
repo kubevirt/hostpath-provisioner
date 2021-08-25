@@ -1,0 +1,6 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: csi-hostpath-provisioner
+provisioner: hostpath.csi.kubevirt.io
+volumeBindingMode: WaitForFirstConsumer

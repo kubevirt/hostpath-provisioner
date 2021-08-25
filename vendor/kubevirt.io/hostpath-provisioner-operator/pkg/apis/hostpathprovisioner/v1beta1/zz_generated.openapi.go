@@ -90,8 +90,9 @@ func schema_pkg_apis_hostpathprovisioner_v1beta1_HostPathProvisionerSpec(ref com
 				Properties: map[string]spec.Schema{
 					"imagePullPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Description: "ImagePullPolicy is the container pull policy for the host path provisioner containers",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"pathConfig": {
@@ -104,6 +105,13 @@ func schema_pkg_apis_hostpathprovisioner_v1beta1_HostPathProvisionerSpec(ref com
 						SchemaProps: spec.SchemaProps{
 							Description: "Restrict on which nodes HPP workload pods will be scheduled",
 							Ref:         ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.NodePlacement"),
+						},
+					},
+					"disableCsi": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisableCSI Use old in tree based provisioner instead of CSI provisioner, default: false",
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 				},

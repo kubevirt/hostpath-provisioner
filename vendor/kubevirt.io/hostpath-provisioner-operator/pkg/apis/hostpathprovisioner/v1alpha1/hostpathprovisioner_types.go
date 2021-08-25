@@ -25,6 +25,7 @@ import (
 // HostPathProvisionerSpec defines the desired state of HostPathProvisioner
 // +k8s:openapi-gen=true
 type HostPathProvisionerSpec struct {
+	// ImagePullPolicy is the container pull policy for the host path provisioner containers
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty" valid:"required"`
 	// PathConfig describes the location and layout of PV storage on nodes
 	PathConfig PathConfig `json:"pathConfig" valid:"required"`

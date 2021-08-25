@@ -5,3 +5,6 @@ hostpath-provisioner
 cmd/provisioner/provisioner
 .project
 _ci-configs/*
+vagrant.key
+e2e.test
+ginkgo

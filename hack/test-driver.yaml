@@ -1,0 +1,23 @@
+# This file describes how to test this deployment of the CSI hostpath driver
+# using the Kubernetes 1.17 E2E test suite. For details see:
+# https://github.com/kubernetes/kubernetes/tree/v1.17.0/test/e2e/storage/external
+
+StorageClass:
+  FromName: true
+SnapshotClass:
+  FromName: false
+DriverInfo:
+  Name: kubevirt.io.hostpath-provisioner
+  Capabilities:
+    block: false
+    controllerExpansion: false
+    exec: true
+    multipods: true
+    nodeExpansion: false
+    persistence: true
+    singleNodeVolume: true
+    snapshotDataSource: false
+    topology: true
+    capacity: true
+  TopologyKeys:
+  - topology.hostpath.csi/node

@@ -90,8 +90,9 @@ func schema_pkg_apis_hostpathprovisioner_v1alpha1_HostPathProvisionerSpec(ref co
 				Properties: map[string]spec.Schema{
 					"imagePullPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Description: "ImagePullPolicy is the container pull policy for the host path provisioner containers",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"pathConfig": {

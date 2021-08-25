@@ -1,3 +1,18 @@
+/*
+Copyright 2021 The hostpath provisioner Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package tests
 
 import (
@@ -10,7 +25,6 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +39,6 @@ import (
 )
 
 var (
-	kubectlPath = flag.String("kubectl-path", "kubectl", "The path to the kubectl binary")
 	kubeConfig  = flag.String("kubeconfig", "/var/run/kubernetes/admin.kubeconfig", "The absolute path to the kubeconfig file")
 	master      = flag.String("master", "", "master url:port")
 )
@@ -36,6 +49,9 @@ const (
 	MiB int64 = 1024 * KiB
 	GiB int64 = 1024 * MiB
 	TiB int64 = 1024 * GiB
+
+	csiProvisionerName = "kubevirt.io.hostpath-provisioner"
+	legacyProvisionerName = "kubevirt.io/hostpath-provisioner"
 )
 
 func setupTestCase(t *testing.T) (func(*testing.T), *kubernetes.Clientset) {
@@ -54,6 +70,7 @@ func setupTestCaseNs(t *testing.T) (func(*testing.T), *corev1.Namespace, *kubern
 		t.Errorf("ERROR, unable to create K8SClient: %v", err)
 	}
 	ns, err := k8sClient.CoreV1().Namespaces().Create(context.TODO(), createNamespace(), metav1.CreateOptions{})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	return func(t *testing.T) {
 		t.Logf("Removing namespace: %s", ns.Name)
 		err := k8sClient.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
@@ -184,18 +201,10 @@ func roundDownCapacityPretty(capacityBytes int64) int64 {
 	return capacityBytes
 }
 
-// Assure reconcile events occur
-func checkReconcileEventsOccur() {
-	// These events are fired when the reconcile loop makes a change
-	gomega.Eventually(func() string {
-		out, err := RunKubeCtlCommand("describe", "hostpathprovisioner", "hostpath-provisioner")
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		return out
-	}, 90*time.Second, 1*time.Second).Should(gomega.ContainSubstring("UpdateResourceStart"))
-
-	gomega.Eventually(func() string {
-		out, err := RunKubeCtlCommand("describe", "hostpathprovisioner", "hostpath-provisioner")
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		return out
-	}, 90*time.Second, 1*time.Second).Should(gomega.ContainSubstring("UpdateResourceSuccess"))
+func isCSIStorageClass(k8sClient *kubernetes.Clientset) bool {
+	sc, err := k8sClient.StorageV1().StorageClasses().Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Expect(sc.Name).To(gomega.Equal("hostpath-provisioner"))
+	return sc.Provisioner == csiProvisionerName
 }
+

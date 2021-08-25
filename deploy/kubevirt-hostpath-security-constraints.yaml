@@ -2,7 +2,7 @@ kind: SecurityContextConstraints
 apiVersion: v1
 metadata:
   name: hostpath-provisioner
-allowPrivilegedContainer: true
+allowPrivilegedContainer: false
 requiredDropCapabilities:
 - KILL
 - MKNOD
@@ -22,3 +22,4 @@ users:
 volumes:
 - hostPath
 - secret
+- projected
