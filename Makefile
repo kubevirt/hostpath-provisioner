@@ -62,8 +62,7 @@ cluster-clean:
 	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} ./cluster-sync/clean.sh
 
 test:
-	go test -v ./cmd/... ./controller/... ./pkg/...
-	hack/run-lint-checks.sh
+	./hack/run-unit-test.sh
 
 test-functional:
 	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -master="" -kubeconfig="../_ci-configs/$(KUBEVIRT_PROVIDER)/.kubeconfig"
