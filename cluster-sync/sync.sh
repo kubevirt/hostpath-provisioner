@@ -128,7 +128,7 @@ spec:
             - name: PROVISIONER_IMAGE
               value: "registry:5000/hostpath-provisioner:latest"
             - name: CSI_PROVISIONER_IMAGE
-              value: "registry:5000/hostpath-provisioner-csi:latest"
+              value: "registry:5000/hostpath-csi-driver:latest"
             - name: EXTERNAL_HEALTH_MON_IMAGE
               value: "k8s.gcr.io/sig-storage/csi-external-health-monitor-controller:v0.3.0"
             - name: NODE_DRIVER_REG_IMAGE

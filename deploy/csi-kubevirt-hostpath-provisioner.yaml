@@ -79,7 +79,7 @@ spec:
       serviceAccountName: csi-hostpath-provisioner-sa
       containers:
         - name: hostpath
-          image: registry:5000/hostpath-provisioner-csi:latest
+          image: registry:5000/hostpath-csi-driver:latest
           args:
             - "--drivername=hostpath.csi.kubevirt.io"
             - "--v=3"
