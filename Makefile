@@ -48,7 +48,7 @@ push-csi: hostpath-provisioner-plugin image-csi
 clean:
 	rm -rf _out
 
-build: clean hostpath-provisioner hostpath-provisioner-csi
+build: clean hostpath-provisioner hostpath-provisioner-plugin
 
 cluster-up:
 	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} ./cluster-up/up.sh
