@@ -63,9 +63,10 @@ cluster-clean:
 
 test:
 	./hack/run-unit-test.sh
+	hack/language.sh
 
 test-functional:
-	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -master="" -kubeconfig="../_ci-configs/$(KUBEVIRT_PROVIDER)/.kubeconfig"
+	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -kubeurl="" -kubeconfig="../_ci-configs/$(KUBEVIRT_PROVIDER)/.kubeconfig"
 
 test-sanity:
 	DOCKER_REPO=${DOCKER_REPO} hack/sanity.sh

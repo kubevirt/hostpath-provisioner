@@ -40,7 +40,7 @@ import (
 
 var (
 	kubeConfig  = flag.String("kubeconfig", "/var/run/kubernetes/admin.kubeconfig", "The absolute path to the kubeconfig file")
-	master      = flag.String("master", "", "master url:port")
+	kubeURL     = flag.String("kubeurl", "", "kube URL url:port")
 )
 
 // Common allocation units
@@ -97,7 +97,7 @@ func getAllNodes(k8sClient *kubernetes.Clientset) (*corev1.NodeList, error) {
 
 // getHPPClient returns a HPP rest client
 func getHPPClient() (*hostpathprovisioner.Clientset, error) {
-	cfg, err := clientcmd.BuildConfigFromFlags(*master, *kubeConfig)
+	cfg, err := clientcmd.BuildConfigFromFlags(*kubeURL, *kubeConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func getHPPClient() (*hostpathprovisioner.Clientset, error) {
 
 // getKubeClient returns a Kubernetes rest client
 func getKubeClient() (*kubernetes.Clientset, error) {
-	cmd, err := clientcmd.BuildConfigFromFlags(*master, *kubeConfig)
+	cmd, err := clientcmd.BuildConfigFromFlags(*kubeURL, *kubeConfig)
 	if err != nil {
 		return nil, err
 	}

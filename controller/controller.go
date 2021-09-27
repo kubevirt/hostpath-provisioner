@@ -417,7 +417,7 @@ func LeaseDuration(leaseDuration time.Duration) func(*ProvisionController) error
 	}
 }
 
-// RenewDeadline is the duration that the acting master will retry
+// RenewDeadline is the duration that the acting leader will retry
 // refreshing leadership before giving up. Defaults to 10 seconds.
 func RenewDeadline(renewDeadline time.Duration) func(*ProvisionController) error {
 	return func(c *ProvisionController) error {
