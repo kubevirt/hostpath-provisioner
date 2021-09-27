@@ -19,14 +19,15 @@ HPP_IMAGE?=hostpath-provisioner
 TAG?=latest
 DOCKER_REPO?=kubevirt
 ARTIFACTS_PATH?=_out
+GOLANG_VER?=1.16.8
 
 all: controller hostpath-provisioner
 
 hostpath-provisioner:
-	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o _out/hostpath-provisioner cmd/provisioner/hostpath-provisioner.go
+	GOLANG_VER=${GOLANG_VER} ./hack/build-provisioner.sh
 
 hostpath-provisioner-plugin:
-	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o _out/hostpath-provisioner-csi cmd/plugin/plugin.go
+	GOLANG_VER=${GOLANG_VER} ./hack/build-csi.sh
 
 image: image-controller image-csi
 
@@ -62,7 +63,7 @@ cluster-clean:
 	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} ./cluster-sync/clean.sh
 
 test:
-	./hack/run-unit-test.sh
+	GOLANG_VER=${GOLANG_VER} ./hack/run-unit-test.sh
 
 test-functional:
 	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -master="" -kubeconfig="../_ci-configs/$(KUBEVIRT_PROVIDER)/.kubeconfig"

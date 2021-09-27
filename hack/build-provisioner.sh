@@ -13,7 +13,6 @@
 #WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #See the License for the specific language governing permissions and
 #limitations under the License.
-set -e
 
 if [[ -v PROW_JOB_ID ]] ; then
   GOLANG_VER=${GOLANG_VER:-1.16.8}
@@ -21,13 +20,6 @@ if [[ -v PROW_JOB_ID ]] ; then
   chown prow:prow -R /home/prow
   eval $(gimme ${GOLANG_VER})
   cp -R /root/.gimme/versions/${GOLANG_VER}.linux.amd64 /usr/local/go
-  echo "Run go test -v in $PWD"
-  sudo -i -u prow /bin/bash -c 'cd /home/prow/go/src/github.com/kubevirt/hostpath-provisioner && /usr/local/go/bin/go test -v ./cmd/... ./controller/... ./pkg/...'
-  go get -u golang.org/x/lint/golint
-else
-  echo "Run go test -v in $PWD"
-  # Run test
-  go test -v ./cmd/... ./controller/... ./pkg/...
 fi
 
-hack/run-lint-checks.sh
+CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o _out/hostpath-provisioner cmd/provisioner/hostpath-provisioner.go
