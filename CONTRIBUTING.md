@@ -18,7 +18,7 @@ As an add-on to Kubernetes, CDI shares some philosophy and design choices:
 * Declarative and Reactive (Operator pattern) approach
 
 This short page shall help to get started with the projects and topics
-surrounding them.  If you notice a strong similarity with the [KubeVirt contribution guidelines](https://github.com/kubevirt/kubevirt/blob/master/CONTRIBUTING.md) it's because we have taken inspiration from their success.
+surrounding them.  If you notice a strong similarity with the [KubeVirt contribution guidelines](https://github.com/kubevirt/kubevirt/blob/main/CONTRIBUTING.md) it's because we have taken inspiration from their success.
 
 
 ## Contributing to Hosthpath provisioner
