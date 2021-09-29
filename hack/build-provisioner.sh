@@ -13,22 +13,8 @@
 #WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #See the License for the specific language governing permissions and
 #limitations under the License.
-set -e
-
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 source "${script_dir}"/common.sh
 setGoInProw $GOLANG_VER
 
-if [[ -v PROW_JOB_ID ]] ; then
-  useradd prow -s /bin/bash
-  chown prow:prow -R /home/prow
-  echo "Run go test -v in $PWD"
-  sudo -i -u prow /bin/bash -c 'cd /home/prow/go/src/github.com/kubevirt/hostpath-provisioner && /usr/local/go/bin/go test -v ./cmd/... ./controller/... ./pkg/...'
-  go get -u golang.org/x/lint/golint
-else
-  echo "Run go test -v in $PWD"
-  # Run test
-  go test -v ./cmd/... ./controller/... ./pkg/...
-fi
-
-hack/run-lint-checks.sh
+CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o _out/hostpath-provisioner cmd/provisioner/hostpath-provisioner.go
