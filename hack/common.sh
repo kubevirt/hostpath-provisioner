@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-
 #Copyright 2021 The hostpath provisioner Authors.
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +11,12 @@
 #WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #See the License for the specific language governing permissions and
 #limitations under the License.
-script_dir="$(cd "$(dirname "$0")" && pwd -P)"
-source "${script_dir}"/common.sh
-setGoInProw $GOLANG_VER
 
-CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o _out/hostpath-provisioner cmd/provisioner/hostpath-provisioner.go
+GOLANG_VER=${GOLANG_VER:-1.16.8}
+
+function setGoInProw() {
+  if [[ -v PROW_JOB_ID ]] ; then
+    eval $(gimme ${1})
+    cp -R ~/.gimme/versions/go${1}.linux.amd64 /usr/local/go
+  fi
+}

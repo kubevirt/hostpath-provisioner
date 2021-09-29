@@ -15,12 +15,13 @@
 #limitations under the License.
 set -e
 
+script_dir="$(cd "$(dirname "$0")" && pwd -P)"
+source "${script_dir}"/common.sh
+setGoInProw $GOLANG_VER
+
 if [[ -v PROW_JOB_ID ]] ; then
-  GOLANG_VER=${GOLANG_VER:-1.16.8}
   useradd prow -s /bin/bash
   chown prow:prow -R /home/prow
-  eval $(gimme ${GOLANG_VER})
-  cp -R ~/.gimme/versions/go${GOLANG_VER}.linux.amd64 /usr/local/go
   echo "Run go test -v in $PWD"
   sudo -i -u prow /bin/bash -c 'cd /home/prow/go/src/github.com/kubevirt/hostpath-provisioner && /usr/local/go/bin/go test -v ./cmd/... ./controller/... ./pkg/...'
   go get -u golang.org/x/lint/golint

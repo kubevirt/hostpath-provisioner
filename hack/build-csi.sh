@@ -14,10 +14,8 @@
 #See the License for the specific language governing permissions and
 #limitations under the License.
 
-if [[ -v PROW_JOB_ID ]] ; then
-  GOLANG_VER=${GOLANG_VER:-1.16.8}
-  eval $(gimme ${GOLANG_VER})
-  cp -R ~/.gimme/versions/go${GOLANG_VER}.linux.amd64 /usr/local/go
-fi
+script_dir="$(cd "$(dirname "$0")" && pwd -P)"
+source "${script_dir}"/common.sh
+setGoInProw $GOLANG_VER
 
 CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o _out/hostpath-provisioner-csi cmd/plugin/plugin.go
