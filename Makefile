@@ -16,6 +16,7 @@
 
 KUBEVIRT_PROVIDER?=k8s-1.20
 HPP_IMAGE?=hostpath-provisioner
+HPP_CSI_IMAGE?=hostpath-csi-driver
 TAG?=latest
 DOCKER_REPO?=kubevirt
 ARTIFACTS_PATH?=_out
@@ -26,7 +27,7 @@ all: controller hostpath-provisioner
 hostpath-provisioner:
 	GOLANG_VER=${GOLANG_VER} ./hack/build-provisioner.sh
 
-hostpath-provisioner-plugin:
+hostpath-csi-driver:
 	GOLANG_VER=${GOLANG_VER} ./hack/build-csi.sh
 
 image: image-controller image-csi
@@ -39,16 +40,16 @@ push-controller: hostpath-provisioner image
 image-controller: hostpath-provisioner
 	docker build -t $(DOCKER_REPO)/$(HPP_IMAGE):$(TAG) -f Dockerfile.controller .
 
-image-csi: hostpath-provisioner-plugin
-	docker build -t $(DOCKER_REPO)/$(HPP_IMAGE)-csi:$(TAG) -f Dockerfile.csi .
+image-csi: hostpath-csi-driver
+	docker build -t $(DOCKER_REPO)/$(HPP_CSI_IMAGE):$(TAG) -f Dockerfile.csi .
 
-push-csi: hostpath-provisioner-plugin image-csi
-	docker push $(DOCKER_REPO)/$(HPP_IMAGE)-csi:$(TAG)
+push-csi: hostpath-csi-driver image-csi
+	docker push $(DOCKER_REPO)/$(HPP_CSI_IMAGE):$(TAG)
 
 clean:
 	rm -rf _out
 
-build: clean hostpath-provisioner hostpath-provisioner-csi
+build: clean hostpath-provisioner hostpath-csi-driver
 
 cluster-up:
 	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} ./cluster-up/up.sh

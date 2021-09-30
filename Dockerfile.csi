@@ -1,4 +1,4 @@
 FROM registry.fedoraproject.org/fedora-minimal:34
-COPY _out/hostpath-provisioner-csi /
-ENTRYPOINT ["/hostpath-provisioner-csi"]
+COPY _out/hostpath-csi-driver /
+ENTRYPOINT ["/hostpath-csi-driver"]
 
