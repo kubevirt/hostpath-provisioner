@@ -29,7 +29,19 @@ func TestSCExists(t *testing.T) {
 	tearDown, k8sClient := setupTestCase(t)
 	defer tearDown(t)
 
-	sc, err := k8sClient.StorageV1().StorageClasses().Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
-	Expect(err).ToNot(HaveOccurred())
-	Expect(sc.Name).To(Equal("hostpath-provisioner"))
+	t.Run("legacy provisioner", func(t *testing.T) {
+		sc, err := k8sClient.StorageV1().StorageClasses().Get(context.TODO(), legacyStorageClassName, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(sc.Name).To(Equal(legacyStorageClassName))
+	})
+	t.Run("legacy provisioner immediate", func(t *testing.T) {
+		sc, err := k8sClient.StorageV1().StorageClasses().Get(context.TODO(), legacyStorageClassNameImmediate, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(sc.Name).To(Equal(legacyStorageClassNameImmediate))
+	})
+	t.Run("csi driver", func(t *testing.T) {
+		sc, err := k8sClient.StorageV1().StorageClasses().Get(context.TODO(), csiStorageClassName, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(sc.Name).To(Equal(csiStorageClassName))
+	})
 }

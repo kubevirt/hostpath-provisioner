@@ -28,7 +28,17 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	hostpathprovisioner "kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1"
+)
+
+const (
+	csiSa = "hostpath-provisioner-admin-csi"
+	legacySa = "hostpath-provisioner-admin"
+	csiClusterRole = "hostpath-provisioner-admin-csi"
+	legacyClusterRole = "hostpath-provisioner"
+	csiClusterRoleBinding = "hostpath-provisioner-admin-csi"
+	legacyClusterRoleBinding = "hostpath-provisioner"
 )
 
 func TestOperatorEventsInstall(t *testing.T) {
@@ -66,12 +76,8 @@ func TestReconcileChangeOnDaemonSet(t *testing.T) {
 	}, 2*time.Minute, 1*time.Second).Should(Equal(originalEnvVarLen))
 }
 
-func TestReconcileChangeOnServiceAccount(t *testing.T) {
-	RegisterTestingT(t)
-	tearDown, k8sClient := setupTestCase(t)
-	defer tearDown(t)
-
-	sa, err := k8sClient.CoreV1().ServiceAccounts("hostpath-provisioner").Get(context.TODO(), "hostpath-provisioner-admin", metav1.GetOptions{})
+func runChangeOnSaTest(saName string, k8sClient *kubernetes.Clientset) {
+	sa, err := k8sClient.CoreV1().ServiceAccounts("hostpath-provisioner").Get(context.TODO(), saName, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	sa.Secrets = []corev1.ObjectReference{}
@@ -80,21 +86,29 @@ func TestReconcileChangeOnServiceAccount(t *testing.T) {
 
 	// Assure secrets get repopulated
 	Eventually(func() []corev1.ObjectReference {
-		sa, err := k8sClient.CoreV1().ServiceAccounts("hostpath-provisioner").Get(context.TODO(), "hostpath-provisioner-admin", metav1.GetOptions{})
+		sa, err := k8sClient.CoreV1().ServiceAccounts("hostpath-provisioner").Get(context.TODO(), saName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		return sa.Secrets
 	}, 2*time.Minute, 1*time.Second).ShouldNot(BeEmpty())
 }
 
-func TestReconcileChangeOnClusterRole(t *testing.T) {
+func TestReconcileChangeOnServiceAccount(t *testing.T) {
 	RegisterTestingT(t)
 	tearDown, k8sClient := setupTestCase(t)
 	defer tearDown(t)
 
-	roleName := "hostpath-provisioner"
-	if isCSIStorageClass(k8sClient) {
-		roleName = "hostpath-provisioner-admin"
-	}
+	t.Run("legacy provisioner", func(t *testing.T) {
+		runChangeOnSaTest(legacySa, k8sClient)
+	})
+	t.Run("csi driver", func(t *testing.T) {
+		if isCSIStorageClass(k8sClient) {
+			runChangeOnSaTest(csiSa, k8sClient)
+		}
+	})
+
+}
+
+func runClusterRoleTest(roleName string, k8sClient *kubernetes.Clientset) {
 	cr, err := k8sClient.RbacV1().ClusterRoles().Get(context.TODO(), roleName, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
@@ -125,16 +139,23 @@ func TestReconcileChangeOnClusterRole(t *testing.T) {
 	}, 2*time.Minute, 1*time.Second).Should(ContainElement("list"))
 }
 
-func TestReconcileChangeOnClusterRoleBinding(t *testing.T) {
+func TestReconcileChangeOnClusterRole(t *testing.T) {
 	RegisterTestingT(t)
 	tearDown, k8sClient := setupTestCase(t)
 	defer tearDown(t)
 
-	roleName := "hostpath-provisioner"
-	if isCSIStorageClass(k8sClient) {
-		roleName = "hostpath-provisioner-admin"
-	}
-	crb, err := k8sClient.RbacV1().ClusterRoleBindings().Get(context.TODO(), roleName, metav1.GetOptions{})
+	t.Run("legacy provisioner", func(t *testing.T) {
+		runClusterRoleTest(legacyClusterRole, k8sClient)
+	})
+	t.Run("csi driver", func(t *testing.T) {
+		if isCSIStorageClass(k8sClient) {
+			runClusterRoleTest(csiClusterRole, k8sClient)
+		}
+	})
+}
+
+func runClusterRoleBindingTest(clusterRoleName string,  k8sClient *kubernetes.Clientset) {
+	crb, err := k8sClient.RbacV1().ClusterRoleBindings().Get(context.TODO(), clusterRoleName, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	crb.Subjects = []rbacv1.Subject{}
@@ -143,10 +164,25 @@ func TestReconcileChangeOnClusterRoleBinding(t *testing.T) {
 
 	// Assure subjects get repopulated
 	Eventually(func() []rbacv1.Subject {
-		crb, err = k8sClient.RbacV1().ClusterRoleBindings().Get(context.TODO(), roleName, metav1.GetOptions{})
+		crb, err = k8sClient.RbacV1().ClusterRoleBindings().Get(context.TODO(), clusterRoleName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		return crb.Subjects
 	}, 2*time.Minute, 1*time.Second).ShouldNot(BeEmpty())
+}
+
+func TestReconcileChangeOnClusterRoleBinding(t *testing.T) {
+	RegisterTestingT(t)
+	tearDown, k8sClient := setupTestCase(t)
+	defer tearDown(t)
+
+	t.Run("legacy provisioner", func(t *testing.T) {
+		runClusterRoleBindingTest(legacyClusterRoleBinding, k8sClient)
+	})
+	t.Run("csi driver", func(t *testing.T) {
+		if isCSIStorageClass(k8sClient) {
+			runClusterRoleBindingTest(csiClusterRoleBinding, k8sClient)
+		}
+	})
 }
 
 func TestCRDExplainable(t *testing.T) {
@@ -179,7 +215,6 @@ func TestNodeSelector(t *testing.T) {
 
 	cr, err := hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
-	Expect(cr.Spec.DisableCsi).To(BeTrue())
 
 	nodes, _ := k8sClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	affinityTestValue := &v1.Affinity{
@@ -198,12 +233,12 @@ func TestNodeSelector(t *testing.T) {
 	nodeSelectorTestValue := map[string]string{"kubernetes.io/arch": "not-a-real-architecture"}
 	tolerationsTestValue := []v1.Toleration{{Key: "test", Value: "123"}}
 
-	origWorkload := cr.Spec.Workload.DeepCopy()
+	origWorkload := cr.Spec.Workloads.DeepCopy()
 	defer func() {
 		cr, err = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 
-		cr.Spec.Workload = *origWorkload.DeepCopy()
+		cr.Spec.Workloads = *origWorkload.DeepCopy()
 
 		_, err = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Update(context.TODO(), cr, metav1.UpdateOptions{})
 		Expect(err).ToNot(HaveOccurred())
@@ -224,7 +259,7 @@ func TestNodeSelector(t *testing.T) {
 		}, 270*time.Second, 1*time.Second).Should(BeTrue())
 	}()
 
-	cr.Spec.Workload = hostpathprovisioner.NodePlacement{
+	cr.Spec.Workloads = hostpathprovisioner.NodePlacement{
 		NodeSelector: nodeSelectorTestValue,
 		Affinity:     affinityTestValue,
 		Tolerations:  tolerationsTestValue,

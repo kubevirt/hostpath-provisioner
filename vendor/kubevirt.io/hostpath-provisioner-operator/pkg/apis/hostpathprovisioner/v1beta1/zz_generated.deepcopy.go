@@ -91,7 +91,7 @@ func (in *HostPathProvisionerList) DeepCopyObject() runtime.Object {
 func (in *HostPathProvisionerSpec) DeepCopyInto(out *HostPathProvisionerSpec) {
 	*out = *in
 	out.PathConfig = in.PathConfig
-	in.Workload.DeepCopyInto(&out.Workload)
+	in.Workloads.DeepCopyInto(&out.Workloads)
 	return
 }
 
