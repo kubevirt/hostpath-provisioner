@@ -25,7 +25,9 @@ The CSI driver is deployed as a daemonset and the pods of the daemonset contain 
 
 Besides the daemonset you will need to create a [storage class](https://github.com/kubevirt/hostpath-provisioner-operator/blob/main/deploy/storageclass-wffc-csi.yaml) that uses WaitForFirstConsumer binding mode, and uses the correct provisioner name. The provisioner name should be `kubevirt.io.hostpath-provisioner` where the legacy provisioner name was `kubevirt.io/hostpath-provisioner`.
 
-You will also need to deploy the appropriate RBAC for the service account used by the daemonset. All of the needed RBAC files can be found in the [deploy](deploy) directory
+You will also need to deploy the appropriate RBAC for the service account used by the daemonset. All of the needed yaml files can be found in the [deploy/csi](deploy/csi) directory. We suggest you deploy them to a specific namespace dedicated to the hostpath csi driver.
+
+Alternatively you can use the [hostpath-provisioner-operator](https://github.com/kubevirt/hostpath-provisioner-operator) to deploy the csi driver. Instructions on how to deploy are available there.
 
 *WARNING* If you select a directory that shares space with your Operating System, you can potentially exhaust the space on that partition and your node will become non-functional. It is recommended you create a separate partition and point the hostpath provisioner there so it will not interfere with your Operating System.
 
