@@ -4,16 +4,23 @@ go 1.16
 
 require (
 	github.com/container-storage-interface/spec v1.5.0
+	github.com/fatih/color v1.13.0 // indirect
+	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/protobuf v1.5.2
 	github.com/kubernetes-csi/csi-lib-utils v0.10.0
 	github.com/kubernetes-csi/csi-test/v4 v4.2.0
+	github.com/mattn/go-colorable v0.1.11 // indirect
 	github.com/onsi/gomega v1.10.4
 	github.com/prometheus/client_golang v1.7.1
-	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
-	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1
+	golang.org/x/mod v0.5.1 // indirect
+	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
+	golang.org/x/sys v0.0.0-20211004093028-2c5d950f24ef
+	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
+	golang.org/x/tools v0.1.7 // indirect
 	google.golang.org/grpc v1.38.0
+	gotest.tools/gotestsum v1.7.0 // indirect
 	k8s.io/api v0.22.0
 	k8s.io/apimachinery v0.21.2
 	k8s.io/client-go v12.0.0+incompatible

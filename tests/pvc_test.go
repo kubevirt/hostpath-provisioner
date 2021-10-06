@@ -27,23 +27,25 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
+const (
+	csiStorageClassName = "hostpath-csi"
+	legacyStorageClassName = "hostpath-provisioner"
+	legacyStorageClassNameImmediate = "hostpath-provisioner-immediate"
+)
 func TestCreatePVCOnNode1(t *testing.T) {
 	RegisterTestingT(t)
 	tearDown, ns, k8sClient := setupTestCaseNs(t)
 	defer tearDown(t)
-
-	if isCSIStorageClass(k8sClient) {
-		t.Skip("Running CSI client")
-	}
 
 	nodes, err := getAllNodes(k8sClient)
 	Expect(err).ToNot(HaveOccurred())
 	annotations := make(map[string]string)
 	annotations["kubevirt.io/provisionOnNode"] = nodes.Items[0].Name
 
-	pvc := createPVCDef(ns.Name, "hostpath-provisioner-immediate", annotations)
+	pvc := createPVCDef(ns.Name, legacyStorageClassNameImmediate, annotations)
 	defer func() {
 		// Cleanup
 		if pvc != nil {
@@ -77,13 +79,9 @@ func TestCreatePVCOnNode1(t *testing.T) {
 	Expect(found).To(BeTrue())
 }
 
-func TestCreatePVCWaitForConsumer(t *testing.T) {
-	RegisterTestingT(t)
-	tearDown, ns, k8sClient := setupTestCaseNs(t)
-	defer tearDown(t)
+func createPVCWaitForFirstConsumerTest(storageClassName string, ns *v1.Namespace, k8sClient *kubernetes.Clientset, t *testing.T) {
 	annotations := make(map[string]string)
-
-	pvc := createPVCDef(ns.Name, "hostpath-provisioner", annotations)
+	pvc := createPVCDef(ns.Name, storageClassName, annotations)
 	defer func() {
 		// Cleanup
 		if pvc != nil {
@@ -129,13 +127,29 @@ func TestCreatePVCWaitForConsumer(t *testing.T) {
 	Expect(pvc.Status.Phase).To(Equal(corev1.ClaimBound))
 }
 
+func TestCreatePVCWaitForConsumerLegacy(t *testing.T) {
+	RegisterTestingT(t)
+	tearDown, ns, k8sClient := setupTestCaseNs(t)
+	defer tearDown(t)
+
+	createPVCWaitForFirstConsumerTest(legacyStorageClassName, ns, k8sClient, t)
+}
+
+func TestCreatePVCWaitForConsumerCsi(t *testing.T) {
+	RegisterTestingT(t)
+	tearDown, ns, k8sClient := setupTestCaseNs(t)
+	defer tearDown(t)
+
+	createPVCWaitForFirstConsumerTest(csiStorageClassName, ns, k8sClient, t)
+}
+
 func TestPVCSize(t *testing.T) {
 	RegisterTestingT(t)
 	tearDown, ns, k8sClient := setupTestCaseNs(t)
 	defer tearDown(t)
 	annotations := make(map[string]string)
 
-	pvc := createPVCDef(ns.Name, "hostpath-provisioner", annotations)
+	pvc := createPVCDef(ns.Name, legacyStorageClassName, annotations)
 	defer func() {
 		// Cleanup
 		if pvc != nil {
@@ -199,7 +213,7 @@ func TestPVCSize(t *testing.T) {
 func createPVCDef(namespace, storageClassName string, annotations map[string]string) *corev1.PersistentVolumeClaim {
 	return &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "test-pvc",
+			GenerateName: "test-pvc",
 			Namespace:   namespace,
 			Annotations: annotations,
 		},

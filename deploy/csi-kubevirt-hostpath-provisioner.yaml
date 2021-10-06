@@ -85,6 +85,7 @@ spec:
             - "--v=3"
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--nodeid=$(KUBE_NODE_NAME)"
+            - "--version=latest"
           env:
             - name: CSI_ENDPOINT
               value: unix://csi/csi.sock

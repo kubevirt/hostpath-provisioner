@@ -72,21 +72,6 @@ _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisione
 fi
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/operator.yaml -n ${HPP_NAMESPACE}
 
-if [ ! -z $UPGRADE_FROM ]; then
-    echo "upgraded"
-    set +e
-    retry_counter=0
-    ret=1
-    while [[ $retry_counter -lt 10 ]] && [[ $ret -eq 1 ]]; do
-      retry_counter=$((retry_counter + 1))
-      _kubectl explain hostpathprovisioner.spec.disableCsi
-      ret=$?
-      echo "ret ${ret}"
-      sleep 5
-    done
-    set -e
-fi
-echo "disableCsi available"
 # Remove deployment
 #_kubectl delete deployment hostpath-provisioner-operator -n hostpath-provisioner --ignore-not-found
 # Redeploy with the correct image name.
@@ -110,7 +95,7 @@ spec:
       containers:
         - name: hostpath-provisioner-operator
           # Replace this with the built image name
-          image: quay.io/kubevirt/hostpath-provisioner-operator:csi
+          image: quay.io/kubevirt/hostpath-provisioner-operator:latest
           command:
           - hostpath-provisioner-operator
           imagePullPolicy: Always
@@ -140,20 +125,10 @@ spec:
             - name: VERBOSITY
               value: "3"
 EOF
-echo "apply disableCsi"
-  cat <<EOF | _kubectl apply -f -
-apiVersion: hostpathprovisioner.kubevirt.io/v1beta1
-kind: HostPathProvisioner
-metadata:
-  name: hostpath-provisioner
-spec:
-  imagePullPolicy: Always
-  disableCsi: true
-  pathConfig:
-    path: "/var/hpvolumes"
-    useNamingPrefix: false
-EOF
+
+_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/hostpathprovisioner_cr.yaml
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/storageclass-wffc.yaml
+_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/storageclass-wffc-csi.yaml
 
 cat <<EOF | _kubectl apply -f -
 apiVersion: storage.k8s.io/v1
