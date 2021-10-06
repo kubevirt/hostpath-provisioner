@@ -67,7 +67,7 @@ function main() {
 
     export TAG
 
-    GIT_ASKPASS="$(pwd)/automation/git-askpass.sh"
+    GIT_ASKPASS="$(pwd)/hack/git-askpass.sh"
     [ -f "$GIT_ASKPASS" ] || exit 1
     export GIT_ASKPASS
 
