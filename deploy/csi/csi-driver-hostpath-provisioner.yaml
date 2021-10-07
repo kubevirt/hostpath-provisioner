@@ -5,6 +5,7 @@ metadata:
 spec:
   attachRequired: false
   storageCapacity: true
+  fsGroupPolicy: "None"
   # Supports persistent volumes.
   volumeLifecycleModes:
   - Persistent
