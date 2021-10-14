@@ -225,7 +225,7 @@ func calculatePvCapacity(path string) (*resource.Quantity, error) {
 		return nil, err
 	}
 	// Capacity is total block count * block size
-	quantity := resource.NewQuantity(int64(roundDownCapacityPretty(int64(statfs.Blocks)*statfs.Bsize)), resource.BinarySI)
+	quantity := resource.NewQuantity(int64(roundDownCapacityPretty(int64(statfs.Blocks)*int64(statfs.Bsize))), resource.BinarySI)
 	return quantity, nil
 }
 
