@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	klog "k8s.io/klog/v2"
 	"k8s.io/utils/mount"
@@ -38,6 +39,7 @@ type Config struct {
 	Endpoint              string
 	NodeID                string
 	DataDir               string
+	SnapshotDir			  string
 	Version	       		  string
 	Mounter mount.Interface
 }
@@ -70,6 +72,10 @@ func NewHostPathDriver(cfg *Config) (*hostPath, error) {
 
 	if err := os.MkdirAll(cfg.DataDir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create dataRoot: %v", err)
+	}
+	cfg.SnapshotDir = filepath.Join(cfg.DataDir, "snapshot")
+	if err := os.MkdirAll(cfg.SnapshotDir, 0750); err != nil {
+		return nil, fmt.Errorf("failed to create snapshot root: %v", err)
 	}
 
 	klog.V(1).Infof("Driver: %s, version: %s ", cfg.DriverName, cfg.Version)

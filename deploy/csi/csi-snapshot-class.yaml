@@ -1,0 +1,7 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: kubevirt-csi-hostpath-snapclass
+driver: kubevirt.io.hostpath-provisioner
+deletionPolicy: Delete
+

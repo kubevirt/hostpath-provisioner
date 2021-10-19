@@ -120,6 +120,8 @@ spec:
               value: "k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.2.0"
             - name: LIVENESS_PROVE_IMAGE
               value: "k8s.gcr.io/sig-storage/livenessprobe:v2.3.0"
+            - name: CSI_SNAPSHOT_IMAGE
+              value: "k8s.gcr.io/sig-storage/csi-snapshotter:v4.2.1"
             - name: CSI_SIG_STORAGE_PROVISIONER_IMAGE
               value: "k8s.gcr.io/sig-storage/csi-provisioner:v2.2.1"
             - name: VERBOSITY
@@ -129,6 +131,13 @@ EOF
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/hostpathprovisioner_cr.yaml
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/storageclass-wffc.yaml
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/storageclass-wffc-csi.yaml
+#install the volume snapshot crds and controller
+_kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
+_kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
+_kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
+_kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml
+_kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml
+_kubectl apply -f ./deploy/csi/csi-snapshot-class.yaml
 
 cat <<EOF | _kubectl apply -f -
 apiVersion: storage.k8s.io/v1

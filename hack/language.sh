@@ -15,6 +15,7 @@ VIOLATIONS=$(git grep -iI -E $PHRASES -- \
 	':!cluster-sync' \
 	':!*generated*' \
 	':!*swagger.json*' \
+	':!hack/k8s-e2e.sh' \
 	':!hack/language.sh' \
 		"${HPP_DIR}" \
 		| grep -v \

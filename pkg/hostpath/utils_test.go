@@ -27,6 +27,7 @@ import (
 const (
 	validVolId = "valid"
 	invalidVolId = "invalid"
+	validSnapshotName = "validsnapshot"
 )
 
 func Test_roundDownCapacityPretty(t *testing.T) {
@@ -105,7 +106,7 @@ func Test_UtilCreateVolume(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := CreateVolume(tt.base, tt.volId)
+			err := CreateVolumeDirectory(tt.base, tt.volId)
 			res := err != nil
 			Expect(res).To(Equal(tt.want), "CreateVolume(%s, %s), returned %v, want %v", tt.base, tt.volId, res, tt.want)
 		})
@@ -121,7 +122,7 @@ func Test_DeleteVolume(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	t.Run("validVolId", func(t *testing.T) {
-		err := CreateVolume(tempDir, validVolId)
+		err := CreateVolumeDirectory(tempDir, validVolId)
 		Expect(err).ToNot(HaveOccurred())
 		err = DeleteVolume(tempDir, validVolId)
 		Expect(err).ToNot(HaveOccurred())

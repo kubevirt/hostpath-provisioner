@@ -56,7 +56,21 @@ subjects:
 - kind: ServiceAccount
   name: csi-hostpath-provisioner-sa
 ---
-
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-snapshotter-role
+subjects:
+  - kind: ServiceAccount
+    name: csi-hostpath-provisioner-sa
+    # replace with non-default namespace name
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  # change the name also here if the ClusterRole gets renamed
+  name: external-snapshotter-runner
+  apiGroup: rbac.authorization.k8s.io
+---
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
@@ -177,6 +191,20 @@ spec:
         imagePullPolicy: IfNotPresent
         name: liveness-probe
         resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /csi
+          name: socket-dir
+      - args:
+        - --v=3
+        - --csi-address=/csi/csi.sock
+        image: k8s.gcr.io/sig-storage/csi-snapshotter:v4.2.1
+        imagePullPolicy: IfNotPresent
+        name: csi-snapshotter
+        resources: {}
+        securityContext:
+          privileged: true
         terminationMessagePath: /dev/termination-log
         terminationMessagePolicy: File
         volumeMounts:

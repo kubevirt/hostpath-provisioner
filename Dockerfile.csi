@@ -1,4 +1,7 @@
 FROM registry.fedoraproject.org/fedora-minimal:34
 COPY _out/hostpath-csi-driver /
+
+RUN microdnf install -y tar bc zstd
+
 ENTRYPOINT ["/hostpath-csi-driver"]
 

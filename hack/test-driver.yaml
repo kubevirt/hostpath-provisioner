@@ -5,7 +5,7 @@
 StorageClass:
   FromName: true
 SnapshotClass:
-  FromName: false
+  FromName: true
 DriverInfo:
   Name: kubevirt.io.hostpath-provisioner
   Capabilities:
@@ -16,7 +16,7 @@ DriverInfo:
     nodeExpansion: false
     persistence: true
     singleNodeVolume: true
-    snapshotDataSource: false
+    snapshotDataSource: true
     topology: true
     capacity: true
   TopologyKeys:

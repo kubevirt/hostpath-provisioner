@@ -18,5 +18,27 @@ function setGoInProw() {
   if [[ -v PROW_JOB_ID ]] ; then
     eval $(gimme ${1})
     cp -R ~/.gimme/versions/go${1}.linux.amd64 /usr/local/go
+    ensureZstd
+    ensureSed
+    ensureBc
   fi
 }
+
+function ensureZstd() {
+  if ! type zstd ; then
+    dnf install -y zstd
+  fi
+}
+
+function ensureSed() {
+  if ! type sed ; then
+    dnf install -y sed
+  fi
+}
+
+function ensureBc() {
+  if ! type bc ; then
+    dnf install -y bc
+  fi
+}
+

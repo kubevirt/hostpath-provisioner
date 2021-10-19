@@ -18,6 +18,9 @@ set -e
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 source "${script_dir}"/common.sh
 setGoInProw $GOLANG_VER
+ensureZstd
+ensureSed
+ensureBc
 
 if [[ -v PROW_JOB_ID ]] ; then
   useradd prow -s /bin/bash

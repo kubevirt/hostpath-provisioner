@@ -20,6 +20,7 @@ require (
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	golang.org/x/tools v0.1.7 // indirect
 	google.golang.org/grpc v1.38.0
+	google.golang.org/protobuf v1.26.0
 	gotest.tools/gotestsum v1.7.0 // indirect
 	k8s.io/api v0.22.0
 	k8s.io/apimachinery v0.21.2
