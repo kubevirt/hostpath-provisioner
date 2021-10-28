@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER:-"k8s-1.21"}
+KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER:-"k8s-1.22"}
 KUBEVIRT_NUM_NODES=${KUBEVIRT_NUM_NODES:-1}
 HPP_NAMESPACE=${HPP_NAMESPACE:-"hostpath-provisioner"}
 

@@ -5,7 +5,12 @@ set -e
 source ${KUBEVIRTCI_PATH}/cluster/ephemeral-provider-common.sh
 
 function up() {
-    ${_cli} run $(_add_common_params)
+    params=$(echo $(_add_common_params))
+    if [[ ! -z $(echo $params | grep ERROR) ]]; then
+        echo -e $params
+        exit 1
+    fi
+    eval ${_cli} run $params
 
     # Copy k8s config and kubectl
     ${_cli} scp --prefix $provider_prefix /usr/bin/kubectl - >${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl
@@ -45,5 +50,47 @@ function up() {
             $kubectl create -f /opt/cnao/network-addons-config-example.cr.yaml
             $kubectl wait networkaddonsconfig cluster --for condition=Available --timeout=200s
         fi
+
+        # Install whereabouts on CNAO lanes
+        $kubectl create -f /opt/whereabouts
+    fi
+
+    if [ "$KUBEVIRT_DEPLOY_ISTIO" == "true" ] && [[ $KUBEVIRT_PROVIDER =~ k8s-1\.1.* ]]; then
+        echo "ERROR: Istio is not supported on kubevirtci version < 1.20"
+        exit 1
+
+    elif [ "$KUBEVIRT_DEPLOY_ISTIO" == "true" ]; then
+        if [ "$KUBEVIRT_WITH_CNAO" == "true" ]; then
+            $kubectl create -f /opt/istio/istio-operator-with-cnao.cr.yaml
+        else
+            $kubectl create -f /opt/istio/istio-operator.cr.yaml
+        fi
+
+        istio_operator_ns=istio-system
+        retries=0
+        max_retries=20
+        while [[ $retries -lt $max_retries ]]; do
+            echo "waiting for istio-operator to be healthy"
+            sleep 5
+            health=$(kubectl -n $istio_operator_ns get istiooperator istio-operator -o jsonpath="{.status.status}")
+            if [[ $health == "HEALTHY" ]]; then
+                break
+            fi
+            retries=$((retries + 1))
+        done
+        if [ $retries == $max_retries ]; then
+            echo "waiting istio-operator to be healthy failed"
+            exit 1
+        fi
+    fi
+
+    if [ "$KUBEVIRT_DEPLOY_CDI" == "true" ]; then
+        $kubectl create -f /opt/cdi-*-operator.yaml
+        $kubectl create -f /opt/cdi-*-cr.yaml
+        while [ $($kubectl get pods --namespace cdi | grep 'cdi-' | wc -l) -lt 4 ]; do
+            $kubectl get pods --namespace cdi
+            sleep 10
+        done
+        $kubectl wait --for=condition=Ready pod --timeout=60s --all --namespace cdi
     fi
 }

@@ -16,7 +16,7 @@
 set -e
 readonly ARTIFACTS_PATH="${ARTIFACTS}"
 export KUBEVIRT_NUM_NODES=2
-export KUBEVIRT_PROVIDER=k8s-1.21
+export KUBEVIRT_PROVIDER=k8s-1.22
 make cluster-down
 make cluster-up
 if [[ -v PROW_JOB_ID ]] ; then
