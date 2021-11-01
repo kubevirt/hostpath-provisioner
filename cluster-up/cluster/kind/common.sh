@@ -25,6 +25,7 @@ export KIND_MANIFESTS_DIR="${KUBEVIRTCI_PATH}/cluster/kind/manifests"
 export KIND_NODE_CLI="docker exec -it "
 export KUBEVIRTCI_PATH
 export KUBEVIRTCI_CONFIG_PATH
+KIND_DEFAULT_NETWORK="kind"
 
 KUBECTL="${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl --kubeconfig=${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubeconfig"
 
@@ -81,22 +82,26 @@ function _ssh_into_node() {
 }
 
 function _run_registry() {
+    local -r network=${1}
+
     until [ -z "$(docker ps -a | grep $REGISTRY_NAME)" ]; do
         docker stop $REGISTRY_NAME || true
         docker rm $REGISTRY_NAME || true
         sleep 5
     done
-    docker run -d -p $HOST_PORT:5000 --restart=always --name $REGISTRY_NAME registry:2
+    docker run -d --network=${network} -p $HOST_PORT:5000  --restart=always --name $REGISTRY_NAME registry:2
 }
 
 function _configure_registry_on_node() {
-    _configure-insecure-registry-and-reload "${NODE_CMD} $1 bash -c"
-    ${NODE_CMD} $1  sh -c "echo $(docker inspect --format '{{.NetworkSettings.IPAddress }}' $REGISTRY_NAME)'\t'registry >> /etc/hosts"
+    local -r node=${1}
+    local -r network=${2}
+
+    _configure-insecure-registry-and-reload "${NODE_CMD} ${node} bash -c"
+    ${NODE_CMD} ${node} sh -c "echo $(docker inspect --format "{{.NetworkSettings.Networks.${network}.IPAddress }}" $REGISTRY_NAME)'\t'registry >> /etc/hosts"
 }
 
 function _install_cnis {
     _install_cni_plugins
-    _install_calico_cni
 }
 
 function _install_cni_plugins {
@@ -112,15 +117,6 @@ function _install_cni_plugins {
         docker cp "${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/$CNI_ARCHIVE" $node:/
         docker exec $node /bin/sh -c "tar xf $CNI_ARCHIVE -C /opt/cni/bin"
     done
-}
-
-function _install_calico_cni {
-    echo "Installing Calico CNI plugin"
-    calico_manifest="$KIND_MANIFESTS_DIR/kube-calico.yaml.in"
-    patched_diff=$(_patch_calico_manifest_diff $calico_manifest)
-    echo "Log Calico manifest diff:"
-    echo "$patched_diff"
-    _patch_calico_manifest "$calico_manifest" "$patched_diff" | _kubectl apply -f -
 }
 
 function prepare_config() {
@@ -175,30 +171,6 @@ function _get_cri_bridge_mtu() {
   docker network inspect -f '{{index .Options "com.docker.network.driver.mtu"}}' bridge
 }
 
-function _patch_calico_manifest_diff() {
-  local -r calico_manifest="$1"
-  local -r calico_diff="$KIND_MANIFESTS_DIR/kube-calico.diff.in"
-
-  local -r cri_mtu=$(_get_cri_bridge_mtu)
-  local -r ipip_mode=$(sed -n '/name:.*CALICO_IPV4POOL_IPIP.*/{n; s/.*value:.*\(Always\|Never\).*/\1/p}' $calico_manifest)
-  if [ $ipip_mode == "Always" ]; then
-    overhead=$((20))
-    calico_mtu=$((cri_mtu - overhead))
-  else
-    calico_mtu=$( sed -n 's/.*veth_mtu:.*\([[:digit:]]\{4,5\}\).*/\1/p' $calico_manifest)
-  fi
-
-  # Substitute MTU placeholder with the calculated MTU
-  CNI_MTU=$calico_mtu envsubst < $calico_diff
-}
-
-function _patch_calico_manifest() {
-  local -r calico_manifest="$1"
-  local -r diff_string="$2"
-  
-  patch $calico_manifest -o - <<< "$diff_string"
-}
-
 function setup_kind() {
     $KIND --loglevel debug create cluster --retain --name=${CLUSTER_NAME} --config=${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/kind.yaml --image=$KIND_NODE_IMAGE
     $KIND get kubeconfig --name=${CLUSTER_NAME} > ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubeconfig
@@ -237,22 +209,19 @@ function setup_kind() {
     done
 
     _wait_containers_ready
-    _run_registry
+    _run_registry "$KIND_DEFAULT_NETWORK"
 
     for node in $(_get_nodes | awk '{print $1}'); do
-        _configure_registry_on_node "$node"
+        _configure_registry_on_node "$node" "$KIND_DEFAULT_NETWORK"
         _configure_network "$node"
     done
     prepare_config
 }
 
 function _add_worker_extra_mounts() {
-    if [[ "$KUBEVIRT_PROVIDER" =~ sriov.* ]]; then
+    if [[ "$KUBEVIRT_PROVIDER" =~ sriov.* || "$KUBEVIRT_PROVIDER" =~ vgpu.* ]]; then
         cat <<EOF >> ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/kind.yaml
   extraMounts:
-  - containerPath: /lib/modules
-    hostPath: /lib/modules
-    readOnly: true
   - containerPath: /dev/vfio/
     hostPath: /dev/vfio/
 EOF
