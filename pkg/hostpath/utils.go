@@ -22,6 +22,18 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	// The storagePool field name in the storage class arguments.
+	storagePoolName = "storagePool"
+	legacyStoragePoolName = "legacy"
+)
+
+// StoragePoolInfo contains the name and path of a storage pool.
+type StoragePoolInfo struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
 // roundDownCapacityPretty Round down the capacity to an easy to read value. Blatantly stolen from here: https://github.com/kubernetes-incubator/external-storage/blob/master/local-volume/provisioner/pkg/discovery/discovery.go#L339
 func roundDownCapacityPretty(capacityBytes int64) int64 {
 
@@ -65,10 +77,10 @@ func DeleteVolume(base, volID string) error {
 	return nil
 }
 
-// IndexOfString returns the index of a matching string, or -1 if not found
-func IndexOfString(value string, list []string) int {
+// IndexOfStartingToken returns the index of a matching string, or -1 if not found
+func IndexOfStartingToken(value string, list []string) int {
 	for i, match := range list {
-		if match == value {
+		if filepath.Base(match) == value {
 			return i
 		}
 	}
@@ -86,4 +98,11 @@ func checkPathExist(path string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func getStoragePoolNameFromMap(params map[string]string) string {
+	if _, ok := params[storagePoolName]; ok {
+		return params[storagePoolName]
+	}
+	return legacyStoragePoolName
 }

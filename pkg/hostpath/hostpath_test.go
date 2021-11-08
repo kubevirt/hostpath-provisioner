@@ -18,6 +18,7 @@ package hostpath
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -25,6 +26,10 @@ import (
 
 	. "github.com/onsi/gomega"
 	"k8s.io/utils/mount"
+)
+
+const (
+	TestDatadirValue = "[{\"name\":\"local\",\"path\":\"%s\"}]"
 )
 
 func Test_NewHostPathDriver(t *testing.T) {
@@ -35,7 +40,7 @@ func Test_NewHostPathDriver(t *testing.T) {
 
 	t.Run("blank config", func(t *testing.T) {
 		cfg := &Config {}
-		_, err = NewHostPathDriver(cfg)
+		_, err = NewHostPathDriver(cfg, fmt.Sprintf(TestDatadirValue, tempDir))
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(BeEquivalentTo(errors.New("no driver name provided")))
 	})
@@ -44,7 +49,7 @@ func Test_NewHostPathDriver(t *testing.T) {
 		cfg := &Config {
 			DriverName: "test_driver",
 		}
-		_, err = NewHostPathDriver(cfg)
+		_, err = NewHostPathDriver(cfg, fmt.Sprintf(TestDatadirValue, tempDir))
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(BeEquivalentTo(errors.New("no node id provided")))
 	})
@@ -54,7 +59,7 @@ func Test_NewHostPathDriver(t *testing.T) {
 			DriverName: "test_driver",
 			NodeID: "test_nodeid",
 		}
-		_, err = NewHostPathDriver(cfg)
+		_, err = NewHostPathDriver(cfg, fmt.Sprintf(TestDatadirValue, tempDir))
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(BeEquivalentTo(errors.New("no driver endpoint provided")))
 	})
@@ -64,7 +69,7 @@ func Test_NewHostPathDriver(t *testing.T) {
 			NodeID: "test_nodeid",
 			Endpoint: "unix://test.sock",
 		}
-		_, err = NewHostPathDriver(cfg)
+		_, err = NewHostPathDriver(cfg, fmt.Sprintf(TestDatadirValue, tempDir))
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(BeEquivalentTo(errors.New("no version provided")))
 	})
@@ -74,10 +79,9 @@ func Test_NewHostPathDriver(t *testing.T) {
 			NodeID: "test_nodeid",
 			Endpoint: "unix://test.sock",
 			Version: "test_version",
-			DataDir: filepath.Join(tempDir, "testdatadir"),
 			Mounter: mount.NewFakeMounter([]mount.MountPoint{}), // If not set it will try to create a real mounter
 		}
-		drv, err := NewHostPathDriver(cfg)
+		drv, err := NewHostPathDriver(cfg, fmt.Sprintf(TestDatadirValue, filepath.Join(tempDir, "testdatadir")))
 		Expect(err).ToNot(HaveOccurred())
 		Expect(drv.node).ToNot(BeNil())
 		Expect(drv.controller).ToNot(BeNil())

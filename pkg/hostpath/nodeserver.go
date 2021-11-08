@@ -132,8 +132,10 @@ func (hpn *hostPathNode) mountVolume(targetPath string, req *csi.NodePublishVolu
 	if readOnly {
 		options = append(options, "ro")
 	}
+	storagePoolName := getStoragePoolNameFromMap(req.GetVolumeContext())
+
 	mounter := hpn.cfg.Mounter
-	path := filepath.Join(hpn.cfg.DataDir, volumeId)
+	path := filepath.Join(hpn.cfg.StoragePoolDataDir[storagePoolName], volumeId)
 
 	if err := mounter.Mount(path, targetPath, fsType, options); err != nil {
 		var errList strings.Builder
