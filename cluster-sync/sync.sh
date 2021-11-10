@@ -85,7 +85,7 @@ _kubectl scale deployment/hostpath-provisioner-operator -n hostpath-provisioner 
 _kubectl wait --for=condition=available deployment -n hostpath-provisioner hostpath-provisioner-operator
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/hostpathprovisioner_legacy_cr.yaml
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc.yaml
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-csi.yaml
+_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-legacy-csi.yaml
 
 cat <<EOF | _kubectl apply -f -
 apiVersion: storage.k8s.io/v1
