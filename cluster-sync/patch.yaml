@@ -1,0 +1,11 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: hostpath-provisioner-operator
+          env:
+            - name: PROVISIONER_IMAGE
+              value: "registry:5000/hostpath-provisioner:latest"
+            - name: CSI_PROVISIONER_IMAGE
+              value: "registry:5000/hostpath-csi-driver:latest"
+
