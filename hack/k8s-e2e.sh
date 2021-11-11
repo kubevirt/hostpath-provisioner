@@ -79,10 +79,12 @@ _kubectl patch deployment hostpath-provisioner-operator -n hostpath-provisioner 
 _kubectl scale deployment/hostpath-provisioner-operator -n hostpath-provisioner --replicas=1
 
 _kubectl wait --for=condition=available deployment -n hostpath-provisioner hostpath-provisioner-operator
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/hostpathprovisioner_cr.yaml
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-csi.yaml
+_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/hostpathprovisioner_legacy_cr.yaml
+_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-legacy-csi.yaml
 #Wait for hpp to be available.
 _kubectl wait hostpathprovisioners.hostpathprovisioner.kubevirt.io/hostpath-provisioner --for=condition=Available --timeout=480s
+
+_kubectl get sc hostpath-csi -o yaml
 
 export KUBE_SSH_KEY_PATH=./vagrant.key
 export KUBE_SSH_USER=vagrant
