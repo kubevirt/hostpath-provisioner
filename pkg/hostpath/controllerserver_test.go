@@ -298,7 +298,7 @@ func Test_DeleteVolumeRequestInvalidPath(t *testing.T) {
 	controller := createControllerServer("/dev")
 
 	_, err := controller.DeleteVolume(context.TODO(), &csi.DeleteVolumeRequest{
-		VolumeId: "null",
+		VolumeId: "cpu",
 	})
 	Expect(err).To(HaveOccurred())
 }
@@ -532,8 +532,8 @@ func Test_getVolumeDirectories(t *testing.T) {
 		res, err := controller.getVolumeDirectories()
 		Expect(err).ToNot(HaveOccurred())
 		Expect(len(res)).To(Equal(2))
-		Expect(res[0]).To(Equal(invalidVolId))
-		Expect(res[1]).To(Equal(validVolId))
+		Expect(res[0]).To(Equal(filepath.Join(tempDir, invalidVolId)))
+		Expect(res[1]).To(Equal(filepath.Join(tempDir, validVolId)))
 	})
 
 	t.Run("adding single file", func(t *testing.T) {
@@ -542,8 +542,8 @@ func Test_getVolumeDirectories(t *testing.T) {
 		res, err := controller.getVolumeDirectories()
 		Expect(err).ToNot(HaveOccurred())
 		Expect(len(res)).To(Equal(2))
-		Expect(res[0]).To(Equal(invalidVolId))
-		Expect(res[1]).To(Equal(validVolId))
+		Expect(res[0]).To(Equal(filepath.Join(tempDir, invalidVolId)))
+		Expect(res[1]).To(Equal(filepath.Join(tempDir, validVolId)))
 	})
 }
 
@@ -828,8 +828,8 @@ func createControllerServer(dataDir string) *hostPathController {
 	config := Config{
 		DriverName: "test_driver",
 		Version:    "test_version",
-		DataDir:    dataDir,
 		NodeID:     "test_node",
+		StoragePoolDataDir: map[string]string{legacyStoragePoolName: dataDir},
 	}
 	return NewHostPathController(&config)
 

@@ -16,6 +16,7 @@ limitations under the License.
 package hostpath
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -37,7 +38,7 @@ type Config struct {
 	DriverName            string
 	Endpoint              string
 	NodeID                string
-	DataDir               string
+	StoragePoolDataDir			map[string]string
 	Version	       		  string
 	Mounter mount.Interface
 }
@@ -49,7 +50,7 @@ type hostPath struct {
 	identity *hostPathIdentity
 }
 
-func NewHostPathDriver(cfg *Config) (*hostPath, error) {
+func NewHostPathDriver(cfg *Config, dataDir string) (*hostPath, error) {
 	if cfg.DriverName == "" {
 		return nil, errors.New("no driver name provided")
 	}
@@ -67,9 +68,21 @@ func NewHostPathDriver(cfg *Config) (*hostPath, error) {
 	if cfg.Mounter == nil {
 		cfg.Mounter = mount.New("")
 	}
+	cfg.StoragePoolDataDir = make(map[string]string, 0)
 
-	if err := os.MkdirAll(cfg.DataDir, 0750); err != nil {
-		return nil, fmt.Errorf("failed to create dataRoot: %v", err)
+	storagePools := make([]StoragePoolInfo, 0)
+	if err := json.Unmarshal([]byte(dataDir), &storagePools); err != nil {
+		return nil, errors.New("unable to parse storage pool info")
+	}
+	for _, storagePool := range storagePools {
+		cfg.StoragePoolDataDir[storagePool.Name] = storagePool.Path
+	}
+
+	for k, v := range cfg.StoragePoolDataDir {
+		klog.V(1).Infof("name: %s, dataDir: %s", k, v)
+		if err := os.MkdirAll(v, 0750); err != nil {
+			return nil, fmt.Errorf("failed to create dataRoot for storage pool %s: %v", k, err)
+		}
 	}
 
 	klog.V(1).Infof("Driver: %s, version: %s ", cfg.DriverName, cfg.Version)

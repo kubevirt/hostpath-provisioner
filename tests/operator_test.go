@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	hostpathprovisioner "kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1"
@@ -39,6 +40,13 @@ const (
 	legacyClusterRole = "hostpath-provisioner"
 	csiClusterRoleBinding = "hostpath-provisioner-admin-csi"
 	legacyClusterRoleBinding = "hostpath-provisioner"
+	csiRoleBinding = "hostpath-provisioner-admin-csi"
+	csiRole = "hostpath-provisioner-admin-csi"
+
+	dsName = "hostpath-provisioner"
+	dsCsiName = "hostpath-provisioner-csi"
+
+	namespace = "hostpath-provisioner"
 )
 
 func TestOperatorEventsInstall(t *testing.T) {
@@ -57,39 +65,111 @@ func TestReconcileChangeOnDaemonSet(t *testing.T) {
 	tearDown, k8sClient := setupTestCase(t)
 	defer tearDown(t)
 
-	ds, err := k8sClient.AppsV1().DaemonSets("hostpath-provisioner").Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
-	Expect(err).ToNot(HaveOccurred())
-	originalEnvVarLen := len(ds.Spec.Template.Spec.Containers[0].Env)
-
-	ds.Spec.Template.Spec.Containers[0].Env = append(ds.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
-		Name: "something",
-		Value: "true",
-	})
-	_, err = k8sClient.AppsV1().DaemonSets("hostpath-provisioner").Update(context.TODO(), ds, metav1.UpdateOptions{})
-	Expect(err).ToNot(HaveOccurred())
-
-	Eventually(func() int {
-		// Assure original value is restored
-		ds, err = k8sClient.AppsV1().DaemonSets("hostpath-provisioner").Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
+	t.Run("Modify daemonset should be reverted", func(t *testing.T) {
+		ds, err := k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
-		return len(ds.Spec.Template.Spec.Containers[0].Env)
-	}, 2*time.Minute, 1*time.Second).Should(Equal(originalEnvVarLen))
+		originalEnvVarLen := len(ds.Spec.Template.Spec.Containers[0].Env)
+
+		ds.Spec.Template.Spec.Containers[0].Env = append(ds.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
+			Name: "something",
+			Value: "true",
+		})
+		_, err = k8sClient.AppsV1().DaemonSets(namespace).Update(context.TODO(), ds, metav1.UpdateOptions{})
+		Expect(err).ToNot(HaveOccurred())
+
+		Eventually(func() int {
+			// Assure original value is restored
+			ds, err = k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsName, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			return len(ds.Spec.Template.Spec.Containers[0].Env)
+		}, 2*time.Minute, 1*time.Second).Should(Equal(originalEnvVarLen))
+	})
+
+	t.Run("Modify daemonset should be reverted CSI", func(t *testing.T) {
+		ds, err := k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsCsiName, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		originalEnvVarLen := len(ds.Spec.Template.Spec.Containers[0].Env)
+
+		ds.Spec.Template.Spec.Containers[0].Env = append(ds.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
+			Name: "something",
+			Value: "true",
+		})
+		_, err = k8sClient.AppsV1().DaemonSets(namespace).Update(context.TODO(), ds, metav1.UpdateOptions{})
+		Expect(err).ToNot(HaveOccurred())
+
+		Eventually(func() int {
+			// Assure original value is restored
+			ds, err = k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsCsiName, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			return len(ds.Spec.Template.Spec.Containers[0].Env)
+		}, 2*time.Minute, 1*time.Second).Should(Equal(originalEnvVarLen))
+	})
+
+	t.Run("Delete daemonset should be restored", func(t *testing.T) {
+		ds, err := k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsName, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+
+		err = k8sClient.AppsV1().DaemonSets(namespace).Delete(context.TODO(), ds.Name, metav1.DeleteOptions{})
+		Expect(err).ToNot(HaveOccurred())
+
+		Eventually(func() bool {
+			// Assure original value is restored
+			ds, err = k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsName, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return false
+			}
+			Expect(err).ToNot(HaveOccurred())
+			return ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
+		}, 2*time.Minute, 1*time.Second).Should(BeTrue())
+	})
+
+	t.Run("Delete daemonset should be restored CSI", func(t *testing.T) {
+		ds, err := k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsCsiName, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+
+		err = k8sClient.AppsV1().DaemonSets(namespace).Delete(context.TODO(), ds.Name, metav1.DeleteOptions{})
+		Expect(err).ToNot(HaveOccurred())
+
+		Eventually(func() bool {
+			// Assure original value is restored
+			ds, err = k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsCsiName, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return false
+			}
+			Expect(err).ToNot(HaveOccurred())
+			return ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
+		}, 2*time.Minute, 1*time.Second).Should(BeTrue())
+	})
 }
 
 func runChangeOnSaTest(saName string, k8sClient *kubernetes.Clientset) {
-	sa, err := k8sClient.CoreV1().ServiceAccounts("hostpath-provisioner").Get(context.TODO(), saName, metav1.GetOptions{})
+	sa, err := k8sClient.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), saName, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	sa.Secrets = []corev1.ObjectReference{}
-	_, err = k8sClient.CoreV1().ServiceAccounts("hostpath-provisioner").Update(context.TODO(), sa, metav1.UpdateOptions{})
+	_, err = k8sClient.CoreV1().ServiceAccounts(namespace).Update(context.TODO(), sa, metav1.UpdateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
 	// Assure secrets get repopulated
 	Eventually(func() []corev1.ObjectReference {
-		sa, err := k8sClient.CoreV1().ServiceAccounts("hostpath-provisioner").Get(context.TODO(), saName, metav1.GetOptions{})
+		sa, err := k8sClient.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), saName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		return sa.Secrets
 	}, 2*time.Minute, 1*time.Second).ShouldNot(BeEmpty())
+}
+
+func runDeleteSaTest(saName string, k8sClient *kubernetes.Clientset) {
+	sa, err := k8sClient.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), saName, metav1.GetOptions{})
+	Expect(err).ToNot(HaveOccurred())
+
+	err = k8sClient.CoreV1().ServiceAccounts(namespace).Delete(context.TODO(), sa.Name, metav1.DeleteOptions{})
+	Expect(err).ToNot(HaveOccurred())
+
+	// Assure secrets get repopulated
+	Eventually(func() error {
+		_, err := k8sClient.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), saName, metav1.GetOptions{})
+		return err
+	}, 2*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 }
 
 func TestReconcileChangeOnServiceAccount(t *testing.T) {
@@ -97,15 +177,22 @@ func TestReconcileChangeOnServiceAccount(t *testing.T) {
 	tearDown, k8sClient := setupTestCase(t)
 	defer tearDown(t)
 
-	t.Run("legacy provisioner", func(t *testing.T) {
+	t.Run("legacy provisioner sa modify", func(t *testing.T) {
 		runChangeOnSaTest(legacySa, k8sClient)
 	})
-	t.Run("csi driver", func(t *testing.T) {
+	t.Run("legacy provisioner sa delete", func(t *testing.T) {
+		runDeleteSaTest(legacySa, k8sClient)
+	})
+	t.Run("csi driver sa modify", func(t *testing.T) {
 		if isCSIStorageClass(k8sClient) {
 			runChangeOnSaTest(csiSa, k8sClient)
 		}
 	})
-
+	t.Run("csi driver sa delete", func(t *testing.T) {
+		if isCSIStorageClass(k8sClient) {
+			runDeleteSaTest(csiSa, k8sClient)
+		}
+	})
 }
 
 func runClusterRoleTest(roleName string, k8sClient *kubernetes.Clientset) {
@@ -168,6 +255,14 @@ func runClusterRoleBindingTest(clusterRoleName string,  k8sClient *kubernetes.Cl
 		Expect(err).ToNot(HaveOccurred())
 		return crb.Subjects
 	}, 2*time.Minute, 1*time.Second).ShouldNot(BeEmpty())
+
+	err = k8sClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), crb.Name, metav1.DeleteOptions{})
+	Expect(err).ToNot(HaveOccurred())
+	Eventually(func() error {
+		_, err = k8sClient.RbacV1().ClusterRoleBindings().Get(context.TODO(), clusterRoleName, metav1.GetOptions{})
+		return err
+	}, 2*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
+
 }
 
 func TestReconcileChangeOnClusterRoleBinding(t *testing.T) {
@@ -183,6 +278,60 @@ func TestReconcileChangeOnClusterRoleBinding(t *testing.T) {
 			runClusterRoleBindingTest(csiClusterRoleBinding, k8sClient)
 		}
 	})
+}
+
+func TestReconcileRoleBinding(t *testing.T) {
+	RegisterTestingT(t)
+	tearDown, k8sClient := setupTestCase(t)
+	defer tearDown(t)
+
+	rb, err := k8sClient.RbacV1().RoleBindings(namespace).Get(context.TODO(), csiRoleBinding, metav1.GetOptions{})
+	Expect(err).ToNot(HaveOccurred())
+
+	rb.Subjects = []rbacv1.Subject{}
+	_, err = k8sClient.RbacV1().RoleBindings(namespace).Update(context.TODO(), rb, metav1.UpdateOptions{})
+	Expect(err).ToNot(HaveOccurred())
+
+	// Assure subjects get repopulated
+	Eventually(func() []rbacv1.Subject {
+		rb, err = k8sClient.RbacV1().RoleBindings(namespace).Get(context.TODO(), csiRoleBinding, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		return rb.Subjects
+	}, 2*time.Minute, 1*time.Second).ShouldNot(BeEmpty())
+
+	err = k8sClient.RbacV1().RoleBindings(namespace).Delete(context.TODO(), rb.Name, metav1.DeleteOptions{})
+	Expect(err).ToNot(HaveOccurred())
+	Eventually(func() error {
+		_, err = k8sClient.RbacV1().RoleBindings(namespace).Get(context.TODO(), csiRoleBinding, metav1.GetOptions{})
+		return err
+	}, 2*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
+}
+
+func TestReconcileRole(t *testing.T) {
+	RegisterTestingT(t)
+	tearDown, k8sClient := setupTestCase(t)
+	defer tearDown(t)
+
+	role, err := k8sClient.RbacV1().Roles(namespace).Get(context.TODO(), csiRole, metav1.GetOptions{})
+	Expect(err).ToNot(HaveOccurred())
+
+	role.Rules = []rbacv1.PolicyRule{}
+	_, err = k8sClient.RbacV1().Roles(namespace).Update(context.TODO(), role, metav1.UpdateOptions{})
+	Expect(err).ToNot(HaveOccurred())
+
+	// Assure subjects get repopulated
+	Eventually(func() []rbacv1.PolicyRule {
+		role, err = k8sClient.RbacV1().Roles(namespace).Get(context.TODO(), csiRole, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		return role.Rules
+	}, 2*time.Minute, 1*time.Second).ShouldNot(BeEmpty())
+
+	err = k8sClient.RbacV1().Roles(namespace).Delete(context.TODO(), role.Name, metav1.DeleteOptions{})
+	Expect(err).ToNot(HaveOccurred())
+	Eventually(func() error {
+		_, err = k8sClient.RbacV1().Roles(namespace).Get(context.TODO(), csiRole, metav1.GetOptions{})
+		return err
+	}, 2*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 }
 
 func TestCRDExplainable(t *testing.T) {
@@ -299,14 +448,7 @@ func TestNodeSelector(t *testing.T) {
 
 }
 
-func Test_CSIDriver(t *testing.T) {
-	RegisterTestingT(t)
-	tearDown, k8sClient := setupTestCase(t)
-	defer tearDown(t)
-
-	if !isCSIStorageClass(k8sClient) {
-		t.Skip("Not CSI driver")
-	}
+func verifyCsiDriver(k8sClient *kubernetes.Clientset) *storagev1.CSIDriver {
 	driver, err := k8sClient.StorageV1().CSIDrivers().Get(context.TODO(), csiProvisionerName, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(driver.Name).To(Equal(csiProvisionerName))
@@ -315,5 +457,31 @@ func Test_CSIDriver(t *testing.T) {
 	Expect(driver.Spec.PodInfoOnMount).ToNot(BeNil())
 	Expect(*driver.Spec.PodInfoOnMount).To(BeTrue())
 	Expect(driver.Spec.VolumeLifecycleModes).To(ContainElement(storagev1.VolumeLifecyclePersistent))
+	return driver
+}
+
+func Test_CSIDriver(t *testing.T) {
+	RegisterTestingT(t)
+	tearDown, k8sClient := setupTestCase(t)
+	defer tearDown(t)
+
+	if !isCSIStorageClass(k8sClient) {
+		t.Skip("Not CSI driver")
+	}
+	driver := verifyCsiDriver(k8sClient)
+	t.Run("delete CSI driver", func(t *testing.T) {
+		attachedRequiredMod := true
+		driver.Spec.AttachRequired = &attachedRequiredMod
+		err := k8sClient.StorageV1().CSIDrivers().Delete(context.TODO(), driver.Name, metav1.DeleteOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		Eventually(func() error {
+			// Assure original value is restored
+			_, err = k8sClient.StorageV1().CSIDrivers().Get(context.TODO(), csiProvisionerName, metav1.GetOptions{})
+			return err
+		}, 2*time.Minute, 1*time.Second).Should(Not(HaveOccurred()))
+
+		verifyCsiDriver(k8sClient)
+	})
 }
 

@@ -30,17 +30,18 @@ func init() {
 func main() {
 	defer klog.Flush()
 	cfg := &hostpath.Config{}
+	var dataDir string
 	klog.InitFlags(nil)
 	flag.Set("logtostderr", "true")
 	flag.StringVar(&cfg.Endpoint, "endpoint", "unix://tmp/csi.sock", "CSI endpoint")
 	flag.StringVar(&cfg.DriverName, "drivername", "hostpath.csi.kubevirt.io", "name of the driver")
-	flag.StringVar(&cfg.DataDir, "datadir", "/csi-data-dir", "directory where volumes and snapshots will be created")
+	flag.StringVar(&dataDir, "datadir", "/csi-data-dir", "storage pool name/path tupels that indicate which storage pool name is associated with which path, in JSON format. Example: [{\"name\":\"local\",\"path\":\"/var/hpvolumes\"}]")
 	flag.StringVar(&cfg.NodeID, "nodeid", "", "node id")
 	flag.StringVar(&cfg.Version, "version", "", "version of the plugin")
 	flag.Parse()
 
 	klog.V(1).Infof("Starting new HostPathDriver, config: %v", *cfg)
-	driver, err := hostpath.NewHostPathDriver(cfg)
+	driver, err := hostpath.NewHostPathDriver(cfg, dataDir)
 	if err != nil {
 		klog.V(1).Infof("Failed to initialize driver: %s", err.Error())
 		os.Exit(1)

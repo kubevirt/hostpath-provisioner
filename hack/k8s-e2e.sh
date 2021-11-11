@@ -66,11 +66,25 @@ DOCKER_REPO=${registry} make push
 
 #install hpp
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/namespace.yaml
-_kubectl apply -f deploy/tests/operator.yaml -n hostpath-provisioner
-_kubectl apply -f deploy/tests/hostpathprovisioner_cr.yaml
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-csi.yaml
+_kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.6.1/cert-manager.yaml
+_kubectl wait --for=condition=available -n cert-manager --timeout=120s --all deployments
+
+_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/webhook.yaml -n hostpath-provisioner
+_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/operator.yaml -n hostpath-provisioner
+# if I don't scale down, a phantom pod sometimes hangs around.
+_kubectl scale deployment/hostpath-provisioner-operator -n hostpath-provisioner --replicas=0
+echo "Updating deployment"
+# patch the correct development image name.
+_kubectl patch deployment hostpath-provisioner-operator -n hostpath-provisioner --patch-file cluster-sync/patch.yaml
+_kubectl scale deployment/hostpath-provisioner-operator -n hostpath-provisioner --replicas=1
+
+_kubectl wait --for=condition=available deployment -n hostpath-provisioner hostpath-provisioner-operator
+_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/hostpathprovisioner_legacy_cr.yaml
+_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-legacy-csi.yaml
 #Wait for hpp to be available.
 _kubectl wait hostpathprovisioners.hostpathprovisioner.kubevirt.io/hostpath-provisioner --for=condition=Available --timeout=480s
+
+_kubectl get sc hostpath-csi -o yaml
 
 export KUBE_SSH_KEY_PATH=./vagrant.key
 export KUBE_SSH_USER=vagrant

@@ -16,6 +16,7 @@ limitations under the License.
 package sanity
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -29,6 +30,7 @@ import (
 
 const (
 	sanityEndpoint = "sanity.sock"
+	TestDatadirValue = "[{\"name\":\"legacy\",\"path\":\"%s\"}]"
 )
 
 func TestMyDriver(t *testing.T) {
@@ -47,11 +49,10 @@ func TestMyDriver(t *testing.T) {
 	cfg := &hostpath.Config{}
 	cfg.Endpoint = filepath.Join(tempDir, sanityEndpoint)
 	cfg.DriverName = "hostpath.csi.kubevirt.io"
-	cfg.DataDir = volumeDir
 	cfg.Version = "test-version"
 	cfg.NodeID = "testnode"
 
-	driver, err := hostpath.NewHostPathDriver(cfg)
+	driver, err := hostpath.NewHostPathDriver(cfg, fmt.Sprintf(TestDatadirValue, volumeDir))
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() { 		

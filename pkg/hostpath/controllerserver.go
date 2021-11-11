@@ -103,20 +103,24 @@ func (hpc *hostPathController) CreateVolume(ctx context.Context, req *csi.Create
 		return nil, err
 	}
 
-	capacity, err := hpc.getVolumeDirCapacity()
+	storagePoolName := getStoragePoolNameFromMap(req.GetParameters())
+	if _, ok := hpc.cfg.StoragePoolDataDir[storagePoolName]; !ok {
+		return nil, fmt.Errorf("unable to locate path for storage pool %s", storagePoolName)
+	}
+	capacity, err := hpc.getVolumeDirCapacity(hpc.cfg.StoragePoolDataDir[storagePoolName])
 	if err != nil {
 		return nil, err
 	}
 	topologies := []*csi.Topology{}
 	topologies = append(topologies, &csi.Topology{Segments: map[string]string{TopologyKeyNode: hpc.cfg.NodeID}})
 
-	if exists, err := checkPathExist(filepath.Join(hpc.cfg.DataDir, req.GetName())); err != nil {
+	if exists, err := checkPathExist(filepath.Join(hpc.cfg.StoragePoolDataDir[storagePoolName], req.GetName())); err != nil {
 		return nil, err
 	} else if !exists {
-		if err := CreateVolume(hpc.cfg.DataDir, req.GetName()); err != nil {
+		if err := CreateVolume(hpc.cfg.StoragePoolDataDir[storagePoolName], req.GetName()); err != nil {
 			return nil, fmt.Errorf("failed to create volume %v: %w", req.GetName(), err)
 		}
-		klog.V(4).Infof("created volume %s at path %s", req.GetName(), filepath.Join(hpc.cfg.DataDir, req.GetName()))
+		klog.V(4).Infof("created volume %s at path %s", req.GetName(), filepath.Join(hpc.cfg.StoragePoolDataDir[storagePoolName], req.GetName()))
 	}	
 
 	return &csi.CreateVolumeResponse{
@@ -132,10 +136,10 @@ func (hpc *hostPathController) CreateVolume(ctx context.Context, req *csi.Create
 
 // getVolumeDirCapacity returns the total available space in the directory where the volumes are being created because
 // there is nothing stopping anyone from using more space than the requested because it is all shared storage.
-func (hpc *hostPathController) getVolumeDirCapacity() (int64, error) {
-	_, capacity, _, _, _, _, err := getPVStatsFunc(hpc.cfg.DataDir)
+func (hpc *hostPathController) getVolumeDirCapacity(path string) (int64, error) {
+	_, capacity, _, _, _, _, err := getPVStatsFunc(path)
 	if err != nil {
-		return int64(0), status.Error(codes.Internal, fmt.Sprintf("Unable to determine capacity: %v", err))
+		return int64(0), status.Error(codes.Internal, fmt.Sprintf("Unable to determine capacity for volume %s: %v", filepath.Base(path), err))
 	}
 	capacity, _ = resource.NewQuantity(int64(roundDownCapacityPretty(capacity)), resource.BinarySI).AsInt64()
 	return capacity, nil
@@ -156,11 +160,22 @@ func (hpc *hostPathController) DeleteVolume(ctx context.Context, req *csi.Delete
 	if err := hpc.validateDeleteVolumeRequest(req); err != nil {
 		return nil, err
 	}
-
-	if err := DeleteVolume(hpc.cfg.DataDir, req.GetVolumeId()); err != nil {
-		return nil, fmt.Errorf("failed to delete volume %v: %w", req.GetVolumeId(), err)
+	volumeDirs, err := hpc.getVolumeDirectories()
+	if err != nil {
+		return nil, err
 	}
-	klog.V(4).Infof("volume %v successfully deleted", req.GetVolumeId())
+	volumePath := ""
+	for _, volumeDir := range volumeDirs {
+		if filepath.Base(volumeDir) == req.GetVolumeId() {
+			volumePath = volumeDir
+		}
+	}
+	if volumePath != "" {
+		if err := DeleteVolume(filepath.Dir(volumePath), req.GetVolumeId()); err != nil {
+			return nil, fmt.Errorf("failed to delete volume %v: %w", req.GetVolumeId(), err)
+		}
+		klog.V(4).Infof("volume %v successfully deleted", req.GetVolumeId())
+	}
 
 	return &csi.DeleteVolumeResponse{}, nil
 }
@@ -185,8 +200,8 @@ func (hpc *hostPathController) ValidateVolumeCapabilities(ctx context.Context, r
 			return nil, status.Error(codes.InvalidArgument, "mount type is undefined")
 		}
 	}
-
-	if exists, err := checkPathExist(filepath.Join(hpc.cfg.DataDir, req.GetVolumeId())); err != nil {
+	storagePoolName := getStoragePoolNameFromMap(req.GetParameters())
+	if exists, err := checkPathExist(filepath.Join(hpc.cfg.StoragePoolDataDir[storagePoolName], req.GetVolumeId())); err != nil {
 		return nil, err
 	} else if !exists {
 		return nil, status.Errorf(codes.NotFound, "volume %s not found", req.GetVolumeId())
@@ -213,7 +228,12 @@ func (hpc *hostPathController) GetCapacity(ctx context.Context, req *csi.GetCapa
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "missing request")
 	}
-	available, capacity, _, _, _, _, err := getPVStatsFunc(hpc.cfg.DataDir)
+	storagePoolName := getStoragePoolNameFromMap(req.GetParameters())
+	klog.V(3).Infof("Checking capacity for storage pool %s", storagePoolName)
+	if _, ok := hpc.cfg.StoragePoolDataDir[storagePoolName]; !ok {
+		return nil, fmt.Errorf("unable to locate path for storage pool %s", storagePoolName)
+	}
+	available, capacity, _, _, _, _, err := getPVStatsFunc(hpc.cfg.StoragePoolDataDir[storagePoolName])
 	if err != nil {
 		return nil, err
 	}
@@ -225,14 +245,16 @@ func (hpc *hostPathController) GetCapacity(ctx context.Context, req *csi.GetCapa
 }
 
 func (hpc *hostPathController) getVolumeDirectories() ([]string, error) {
-	files, err := ioutil.ReadDir(hpc.cfg.DataDir)
-	if err != nil {
-		return nil, err
-	}
 	directories := make([]string, 0)
-	for _, file := range files {
-		if file.IsDir() {
-			directories = append(directories, file.Name())
+	for _, path := range hpc.cfg.StoragePoolDataDir {
+		files, err := ioutil.ReadDir(path)
+		if err != nil {
+			return nil, err
+		}
+		for _, file := range files {
+			if file.IsDir() {
+				directories = append(directories, filepath.Join(path, file.Name()))
+			}
 		}
 	}
 	sort.Strings(directories)
@@ -258,9 +280,13 @@ func (hpc *hostPathController) ListVolumes(ctx context.Context, req *csi.ListVol
 		Entries: []*csi.ListVolumesResponse_Entry{},
 	}
 
-	capacity, err := hpc.getVolumeDirCapacity()
-	if err != nil {
-		return nil, err
+	capacityMap := make(map[string]int64)
+	for _, path := range hpc.cfg.StoragePoolDataDir {
+		capacity, err := hpc.getVolumeDirCapacity(path)
+		if err != nil {
+			return nil, err
+		}
+		capacityMap[path] = capacity
 	}
 
 	volumeDirs, err := hpc.getVolumeDirectories()
@@ -270,7 +296,7 @@ func (hpc *hostPathController) ListVolumes(ctx context.Context, req *csi.ListVol
 
 	if len(volumeDirs) > 0 {
 		if req.StartingToken == "" {
-			req.StartingToken = volumeDirs[0]
+			req.StartingToken = filepath.Base(volumeDirs[0])
 		}
 
 		volumesLength := int64(len(volumeDirs))
@@ -278,7 +304,7 @@ func (hpc *hostPathController) ListVolumes(ctx context.Context, req *csi.ListVol
 		if maxLength == 0 {
 			maxLength = volumesLength
 		}
-		start := IndexOfString(req.StartingToken, volumeDirs)
+		start := IndexOfStartingToken(req.StartingToken, volumeDirs)
 		if start == -1 {
 			return nil, status.Errorf(codes.InvalidArgument, "volume %s not found", req.StartingToken)
 		}
@@ -290,12 +316,12 @@ func (hpc *hostPathController) ListVolumes(ctx context.Context, req *csi.ListVol
 		}
 
 		for _, volumeId := range volumeDirs[start:end] {
-			healthy, msg := doHealthCheckInControllerSide(filepath.Join(hpc.cfg.DataDir, volumeId))
+			healthy, msg := doHealthCheckInControllerSide(volumeId)
 			klog.V(3).Infof("Healthy state: %s Volume: %t", volumeId, healthy)
 			volumeRes.Entries = append(volumeRes.Entries, &csi.ListVolumesResponse_Entry{
 				Volume: &csi.Volume{
-					VolumeId:      volumeId,
-					CapacityBytes: capacity,
+					VolumeId:      filepath.Base(volumeId),
+					CapacityBytes: capacityMap[filepath.Dir(volumeId)],
 				},
 				Status: &csi.ListVolumesResponse_VolumeStatus{
 					PublishedNodeIds: []string{hpc.cfg.NodeID},
@@ -307,7 +333,7 @@ func (hpc *hostPathController) ListVolumes(ctx context.Context, req *csi.ListVol
 			})
 		}
 		if end < volumesLength - 1 {
-			volumeRes.NextToken = volumeDirs[end]
+			volumeRes.NextToken = filepath.Base(volumeDirs[end])
 		}
 	} else {
 		if req.StartingToken != "" {
@@ -324,17 +350,35 @@ func (hpc *hostPathController) ControllerGetVolume(ctx context.Context, req *csi
 	if req.GetVolumeId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID not provided")
 	}
-	capacity, err := hpc.getVolumeDirCapacity()
+
+	capacityMap := make(map[string]int64)
+	for _, path := range hpc.cfg.StoragePoolDataDir {
+		capacity, err := hpc.getVolumeDirCapacity(path)
+		if err != nil {
+			return nil, err
+		}
+		capacityMap[path] = capacity
+	}
+	volumeDirs, err := hpc.getVolumeDirectories()
 	if err != nil {
 		return nil, err
 	}
+	volumePath := ""
+	for _, volumeDir := range volumeDirs {
+		if filepath.Base(volumeDir) == req.GetVolumeId() {
+			volumePath = volumeDir
+		}
+	}
 
-	healthy, msg := doHealthCheckInControllerSide(filepath.Join(hpc.cfg.DataDir, req.GetVolumeId()))
+	if volumePath == "" {
+		return nil, status.Errorf(codes.NotFound, "volume %s not found", req.GetVolumeId())
+	}
+	healthy, msg := doHealthCheckInControllerSide(volumePath)
 	klog.V(3).Infof("Healthy state: %s Volume: %t", req.GetVolumeId(), healthy)
 	return &csi.ControllerGetVolumeResponse{
 		Volume: &csi.Volume{
 			VolumeId:      req.GetVolumeId(),
-			CapacityBytes: capacity,
+			CapacityBytes: capacityMap[filepath.Dir(volumePath)],
 		},
 		Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
 			PublishedNodeIds: []string{hpc.cfg.NodeID},
