@@ -26,7 +26,8 @@ if [[ -v PROW_JOB_ID ]] ; then
 fi
 
 go get gotest.tools/gotestsum
-export UPGRADE_FROM=$(curl -s https://github.com/kubevirt/hostpath-provisioner-operator/releases/latest | grep -o "v[0-9]\.[0-9]*\.[0-9]*")
+#export UPGRADE_FROM=$(curl -s https://github.com/kubevirt/hostpath-provisioner-operator/releases/latest | grep -o "v[0-9]\.[0-9]*\.[0-9]*")
+export UPGRADE_FROM="v0.9.0"
 echo "Upgrading from verions: $UPGRADE_FROM"
 
 make cluster-sync
