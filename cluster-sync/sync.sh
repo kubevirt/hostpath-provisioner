@@ -72,17 +72,19 @@ _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisione
 fi
 _kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.6.1/cert-manager.yaml
 _kubectl wait --for=condition=available -n cert-manager --timeout=120s --all deployments
-
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/webhook.yaml -n hostpath-provisioner
+echo "Deploying"
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/operator.yaml -n ${HPP_NAMESPACE}
-# if I don't scale down, a phantom pod sometimes hangs around.
-_kubectl scale deployment/hostpath-provisioner-operator -n hostpath-provisioner --replicas=0
+
+echo "Waiting for it to be ready"
+_kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=30s
+
 echo "Updating deployment"
+_kubectl get pods -n hostpath-provisioner
 # patch the correct development image name.
 _kubectl patch deployment hostpath-provisioner-operator -n hostpath-provisioner --patch-file cluster-sync/patch.yaml
-_kubectl scale deployment/hostpath-provisioner-operator -n hostpath-provisioner --replicas=1
 
-_kubectl wait --for=condition=available deployment -n hostpath-provisioner hostpath-provisioner-operator
+_kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=30s
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/hostpathprovisioner_legacy_cr.yaml
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc.yaml
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-legacy-csi.yaml
