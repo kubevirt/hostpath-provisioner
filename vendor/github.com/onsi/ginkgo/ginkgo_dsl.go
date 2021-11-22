@@ -22,8 +22,9 @@ import (
 
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/internal/codelocation"
-	"github.com/onsi/ginkgo/internal/global"
+	"github.com/onsi/ginkgo/internal/failer"
 	"github.com/onsi/ginkgo/internal/remote"
+	"github.com/onsi/ginkgo/internal/suite"
 	"github.com/onsi/ginkgo/internal/testingtproxy"
 	"github.com/onsi/ginkgo/internal/writer"
 	"github.com/onsi/ginkgo/reporters"
@@ -45,10 +46,16 @@ To circumvent this, you should call
 
 at the top of the goroutine that caused this panic.
 `
+const defaultTimeout = 1
+
+var globalSuite *suite.Suite
+var globalFailer *failer.Failer
 
 func init() {
 	config.Flags(flag.CommandLine, "ginkgo", true)
 	GinkgoWriter = writer.New(os.Stdout)
+	globalFailer = failer.New()
+	globalSuite = suite.New(globalFailer)
 }
 
 //GinkgoWriter implements an io.Writer
@@ -93,36 +100,26 @@ func GinkgoT(optionalOffset ...int) GinkgoTInterface {
 	if len(optionalOffset) > 0 {
 		offset = optionalOffset[0]
 	}
-	failedFunc := func() bool {
-		return CurrentGinkgoTestDescription().Failed
-	}
-	nameFunc := func() string {
-		return CurrentGinkgoTestDescription().FullTestText
-	}
-	return testingtproxy.New(GinkgoWriter, Fail, Skip, failedFunc, nameFunc, offset)
+	return testingtproxy.New(GinkgoWriter, Fail, offset)
 }
 
 //The interface returned by GinkgoT().  This covers most of the methods
 //in the testing package's T.
 type GinkgoTInterface interface {
-	Cleanup(func())
+	Fail()
 	Error(args ...interface{})
 	Errorf(format string, args ...interface{})
-	Fail()
 	FailNow()
-	Failed() bool
 	Fatal(args ...interface{})
 	Fatalf(format string, args ...interface{})
-	Helper()
 	Log(args ...interface{})
 	Logf(format string, args ...interface{})
-	Name() string
+	Failed() bool
 	Parallel()
 	Skip(args ...interface{})
-	SkipNow()
 	Skipf(format string, args ...interface{})
+	SkipNow()
 	Skipped() bool
-	TempDir() string
 }
 
 //Custom Ginkgo test reporters must implement the Reporter interface.
@@ -159,7 +156,7 @@ type GinkgoTestDescription struct {
 
 //CurrentGinkgoTestDescripton returns information about the current running test.
 func CurrentGinkgoTestDescription() GinkgoTestDescription {
-	summary, ok := global.Suite.CurrentRunningSpecSummary()
+	summary, ok := globalSuite.CurrentRunningSpecSummary()
 	if !ok {
 		return GinkgoTestDescription{}
 	}
@@ -226,7 +223,7 @@ func RunSpecsWithCustomReporters(t GinkgoTestingT, description string, specRepor
 	for i, reporter := range specReporters {
 		reporters[i] = reporter
 	}
-	passed, hasFocusedTests := global.Suite.Run(t, description, reporters, writer, config.GinkgoConfig)
+	passed, hasFocusedTests := globalSuite.Run(t, description, reporters, writer, config.GinkgoConfig)
 	if passed && hasFocusedTests && strings.TrimSpace(os.Getenv("GINKGO_EDITOR_INTEGRATION")) == "" {
 		fmt.Println("PASS | FOCUSED")
 		os.Exit(types.GINKGO_FOCUS_EXIT_CODE)
@@ -255,7 +252,7 @@ func Skip(message string, callerSkip ...int) {
 		skip = callerSkip[0]
 	}
 
-	global.Failer.Skip(message, codelocation.New(skip+1))
+	globalFailer.Skip(message, codelocation.New(skip+1))
 	panic(GINKGO_PANIC)
 }
 
@@ -266,7 +263,7 @@ func Fail(message string, callerSkip ...int) {
 		skip = callerSkip[0]
 	}
 
-	global.Failer.Fail(message, codelocation.New(skip+1))
+	globalFailer.Fail(message, codelocation.New(skip+1))
 	panic(GINKGO_PANIC)
 }
 
@@ -283,7 +280,7 @@ func Fail(message string, callerSkip ...int) {
 func GinkgoRecover() {
 	e := recover()
 	if e != nil {
-		global.Failer.Panic(codelocation.New(1), e)
+		globalFailer.Panic(codelocation.New(1), e)
 	}
 }
 
@@ -294,25 +291,25 @@ func GinkgoRecover() {
 //equivalent.  The difference is purely semantic -- you typically Describe the behavior of an object
 //or method and, within that Describe, outline a number of Contexts and Whens.
 func Describe(text string, body func()) bool {
-	global.Suite.PushContainerNode(text, body, types.FlagTypeNone, codelocation.New(1))
+	globalSuite.PushContainerNode(text, body, types.FlagTypeNone, codelocation.New(1))
 	return true
 }
 
 //You can focus the tests within a describe block using FDescribe
 func FDescribe(text string, body func()) bool {
-	global.Suite.PushContainerNode(text, body, types.FlagTypeFocused, codelocation.New(1))
+	globalSuite.PushContainerNode(text, body, types.FlagTypeFocused, codelocation.New(1))
 	return true
 }
 
 //You can mark the tests within a describe block as pending using PDescribe
 func PDescribe(text string, body func()) bool {
-	global.Suite.PushContainerNode(text, body, types.FlagTypePending, codelocation.New(1))
+	globalSuite.PushContainerNode(text, body, types.FlagTypePending, codelocation.New(1))
 	return true
 }
 
 //You can mark the tests within a describe block as pending using XDescribe
 func XDescribe(text string, body func()) bool {
-	global.Suite.PushContainerNode(text, body, types.FlagTypePending, codelocation.New(1))
+	globalSuite.PushContainerNode(text, body, types.FlagTypePending, codelocation.New(1))
 	return true
 }
 
@@ -323,25 +320,25 @@ func XDescribe(text string, body func()) bool {
 //equivalent.  The difference is purely semantic -- you typical Describe the behavior of an object
 //or method and, within that Describe, outline a number of Contexts and Whens.
 func Context(text string, body func()) bool {
-	global.Suite.PushContainerNode(text, body, types.FlagTypeNone, codelocation.New(1))
+	globalSuite.PushContainerNode(text, body, types.FlagTypeNone, codelocation.New(1))
 	return true
 }
 
 //You can focus the tests within a describe block using FContext
 func FContext(text string, body func()) bool {
-	global.Suite.PushContainerNode(text, body, types.FlagTypeFocused, codelocation.New(1))
+	globalSuite.PushContainerNode(text, body, types.FlagTypeFocused, codelocation.New(1))
 	return true
 }
 
 //You can mark the tests within a describe block as pending using PContext
 func PContext(text string, body func()) bool {
-	global.Suite.PushContainerNode(text, body, types.FlagTypePending, codelocation.New(1))
+	globalSuite.PushContainerNode(text, body, types.FlagTypePending, codelocation.New(1))
 	return true
 }
 
 //You can mark the tests within a describe block as pending using XContext
 func XContext(text string, body func()) bool {
-	global.Suite.PushContainerNode(text, body, types.FlagTypePending, codelocation.New(1))
+	globalSuite.PushContainerNode(text, body, types.FlagTypePending, codelocation.New(1))
 	return true
 }
 
@@ -352,25 +349,25 @@ func XContext(text string, body func()) bool {
 //equivalent.  The difference is purely semantic -- you typical Describe the behavior of an object
 //or method and, within that Describe, outline a number of Contexts and Whens.
 func When(text string, body func()) bool {
-	global.Suite.PushContainerNode("when "+text, body, types.FlagTypeNone, codelocation.New(1))
+	globalSuite.PushContainerNode("when "+text, body, types.FlagTypeNone, codelocation.New(1))
 	return true
 }
 
 //You can focus the tests within a describe block using FWhen
 func FWhen(text string, body func()) bool {
-	global.Suite.PushContainerNode("when "+text, body, types.FlagTypeFocused, codelocation.New(1))
+	globalSuite.PushContainerNode("when "+text, body, types.FlagTypeFocused, codelocation.New(1))
 	return true
 }
 
 //You can mark the tests within a describe block as pending using PWhen
 func PWhen(text string, body func()) bool {
-	global.Suite.PushContainerNode("when "+text, body, types.FlagTypePending, codelocation.New(1))
+	globalSuite.PushContainerNode("when "+text, body, types.FlagTypePending, codelocation.New(1))
 	return true
 }
 
 //You can mark the tests within a describe block as pending using XWhen
 func XWhen(text string, body func()) bool {
-	global.Suite.PushContainerNode("when "+text, body, types.FlagTypePending, codelocation.New(1))
+	globalSuite.PushContainerNode("when "+text, body, types.FlagTypePending, codelocation.New(1))
 	return true
 }
 
@@ -380,25 +377,25 @@ func XWhen(text string, body func()) bool {
 //Ginkgo will normally run It blocks synchronously.  To perform asynchronous tests, pass a
 //function that accepts a Done channel.  When you do this, you can also provide an optional timeout.
 func It(text string, body interface{}, timeout ...float64) bool {
-	global.Suite.PushItNode(text, body, types.FlagTypeNone, codelocation.New(1), parseTimeout(timeout...))
+	globalSuite.PushItNode(text, body, types.FlagTypeNone, codelocation.New(1), parseTimeout(timeout...))
 	return true
 }
 
 //You can focus individual Its using FIt
 func FIt(text string, body interface{}, timeout ...float64) bool {
-	global.Suite.PushItNode(text, body, types.FlagTypeFocused, codelocation.New(1), parseTimeout(timeout...))
+	globalSuite.PushItNode(text, body, types.FlagTypeFocused, codelocation.New(1), parseTimeout(timeout...))
 	return true
 }
 
 //You can mark Its as pending using PIt
 func PIt(text string, _ ...interface{}) bool {
-	global.Suite.PushItNode(text, func() {}, types.FlagTypePending, codelocation.New(1), 0)
+	globalSuite.PushItNode(text, func() {}, types.FlagTypePending, codelocation.New(1), 0)
 	return true
 }
 
 //You can mark Its as pending using XIt
 func XIt(text string, _ ...interface{}) bool {
-	global.Suite.PushItNode(text, func() {}, types.FlagTypePending, codelocation.New(1), 0)
+	globalSuite.PushItNode(text, func() {}, types.FlagTypePending, codelocation.New(1), 0)
 	return true
 }
 
@@ -406,25 +403,25 @@ func XIt(text string, _ ...interface{}) bool {
 //which "It" does not fit into a natural sentence flow. All the same protocols apply for Specify blocks
 //which apply to It blocks.
 func Specify(text string, body interface{}, timeout ...float64) bool {
-	global.Suite.PushItNode(text, body, types.FlagTypeNone, codelocation.New(1), parseTimeout(timeout...))
+	globalSuite.PushItNode(text, body, types.FlagTypeNone, codelocation.New(1), parseTimeout(timeout...))
 	return true
 }
 
 //You can focus individual Specifys using FSpecify
 func FSpecify(text string, body interface{}, timeout ...float64) bool {
-	global.Suite.PushItNode(text, body, types.FlagTypeFocused, codelocation.New(1), parseTimeout(timeout...))
+	globalSuite.PushItNode(text, body, types.FlagTypeFocused, codelocation.New(1), parseTimeout(timeout...))
 	return true
 }
 
 //You can mark Specifys as pending using PSpecify
 func PSpecify(text string, is ...interface{}) bool {
-	global.Suite.PushItNode(text, func() {}, types.FlagTypePending, codelocation.New(1), 0)
+	globalSuite.PushItNode(text, func() {}, types.FlagTypePending, codelocation.New(1), 0)
 	return true
 }
 
 //You can mark Specifys as pending using XSpecify
 func XSpecify(text string, is ...interface{}) bool {
-	global.Suite.PushItNode(text, func() {}, types.FlagTypePending, codelocation.New(1), 0)
+	globalSuite.PushItNode(text, func() {}, types.FlagTypePending, codelocation.New(1), 0)
 	return true
 }
 
@@ -455,25 +452,25 @@ func By(text string, callbacks ...func()) {
 //The body function must have the signature:
 //	func(b Benchmarker)
 func Measure(text string, body interface{}, samples int) bool {
-	global.Suite.PushMeasureNode(text, body, types.FlagTypeNone, codelocation.New(1), samples)
+	globalSuite.PushMeasureNode(text, body, types.FlagTypeNone, codelocation.New(1), samples)
 	return true
 }
 
 //You can focus individual Measures using FMeasure
 func FMeasure(text string, body interface{}, samples int) bool {
-	global.Suite.PushMeasureNode(text, body, types.FlagTypeFocused, codelocation.New(1), samples)
+	globalSuite.PushMeasureNode(text, body, types.FlagTypeFocused, codelocation.New(1), samples)
 	return true
 }
 
 //You can mark Measurements as pending using PMeasure
 func PMeasure(text string, _ ...interface{}) bool {
-	global.Suite.PushMeasureNode(text, func(b Benchmarker) {}, types.FlagTypePending, codelocation.New(1), 0)
+	globalSuite.PushMeasureNode(text, func(b Benchmarker) {}, types.FlagTypePending, codelocation.New(1), 0)
 	return true
 }
 
 //You can mark Measurements as pending using XMeasure
 func XMeasure(text string, _ ...interface{}) bool {
-	global.Suite.PushMeasureNode(text, func(b Benchmarker) {}, types.FlagTypePending, codelocation.New(1), 0)
+	globalSuite.PushMeasureNode(text, func(b Benchmarker) {}, types.FlagTypePending, codelocation.New(1), 0)
 	return true
 }
 
@@ -484,7 +481,7 @@ func XMeasure(text string, _ ...interface{}) bool {
 //
 //You may only register *one* BeforeSuite handler per test suite.  You typically do so in your bootstrap file at the top level.
 func BeforeSuite(body interface{}, timeout ...float64) bool {
-	global.Suite.SetBeforeSuiteNode(body, codelocation.New(1), parseTimeout(timeout...))
+	globalSuite.SetBeforeSuiteNode(body, codelocation.New(1), parseTimeout(timeout...))
 	return true
 }
 
@@ -497,7 +494,7 @@ func BeforeSuite(body interface{}, timeout ...float64) bool {
 //
 //You may only register *one* AfterSuite handler per test suite.  You typically do so in your bootstrap file at the top level.
 func AfterSuite(body interface{}, timeout ...float64) bool {
-	global.Suite.SetAfterSuiteNode(body, codelocation.New(1), parseTimeout(timeout...))
+	globalSuite.SetAfterSuiteNode(body, codelocation.New(1), parseTimeout(timeout...))
 	return true
 }
 
@@ -542,7 +539,7 @@ func AfterSuite(body interface{}, timeout ...float64) bool {
 //		Ω(err).ShouldNot(HaveOccurred())
 //	})
 func SynchronizedBeforeSuite(node1Body interface{}, allNodesBody interface{}, timeout ...float64) bool {
-	global.Suite.SetSynchronizedBeforeSuiteNode(
+	globalSuite.SetSynchronizedBeforeSuiteNode(
 		node1Body,
 		allNodesBody,
 		codelocation.New(1),
@@ -569,7 +566,7 @@ func SynchronizedBeforeSuite(node1Body interface{}, allNodesBody interface{}, ti
 //		dbRunner.Stop()
 //	})
 func SynchronizedAfterSuite(allNodesBody interface{}, node1Body interface{}, timeout ...float64) bool {
-	global.Suite.SetSynchronizedAfterSuiteNode(
+	globalSuite.SetSynchronizedAfterSuiteNode(
 		allNodesBody,
 		node1Body,
 		codelocation.New(1),
@@ -584,7 +581,7 @@ func SynchronizedAfterSuite(allNodesBody interface{}, node1Body interface{}, tim
 //Like It blocks, BeforeEach blocks can be made asynchronous by providing a body function that accepts
 //a Done channel
 func BeforeEach(body interface{}, timeout ...float64) bool {
-	global.Suite.PushBeforeEachNode(body, codelocation.New(1), parseTimeout(timeout...))
+	globalSuite.PushBeforeEachNode(body, codelocation.New(1), parseTimeout(timeout...))
 	return true
 }
 
@@ -594,7 +591,7 @@ func BeforeEach(body interface{}, timeout ...float64) bool {
 //Like It blocks, BeforeEach blocks can be made asynchronous by providing a body function that accepts
 //a Done channel
 func JustBeforeEach(body interface{}, timeout ...float64) bool {
-	global.Suite.PushJustBeforeEachNode(body, codelocation.New(1), parseTimeout(timeout...))
+	globalSuite.PushJustBeforeEachNode(body, codelocation.New(1), parseTimeout(timeout...))
 	return true
 }
 
@@ -604,7 +601,7 @@ func JustBeforeEach(body interface{}, timeout ...float64) bool {
 //Like It blocks, JustAfterEach blocks can be made asynchronous by providing a body function that accepts
 //a Done channel
 func JustAfterEach(body interface{}, timeout ...float64) bool {
-	global.Suite.PushJustAfterEachNode(body, codelocation.New(1), parseTimeout(timeout...))
+	globalSuite.PushJustAfterEachNode(body, codelocation.New(1), parseTimeout(timeout...))
 	return true
 }
 
@@ -614,13 +611,13 @@ func JustAfterEach(body interface{}, timeout ...float64) bool {
 //Like It blocks, AfterEach blocks can be made asynchronous by providing a body function that accepts
 //a Done channel
 func AfterEach(body interface{}, timeout ...float64) bool {
-	global.Suite.PushAfterEachNode(body, codelocation.New(1), parseTimeout(timeout...))
+	globalSuite.PushAfterEachNode(body, codelocation.New(1), parseTimeout(timeout...))
 	return true
 }
 
 func parseTimeout(timeout ...float64) time.Duration {
 	if len(timeout) == 0 {
-		return global.DefaultTimeout
+		return time.Duration(defaultTimeout * int64(time.Second))
 	} else {
 		return time.Duration(timeout[0] * float64(time.Second))
 	}

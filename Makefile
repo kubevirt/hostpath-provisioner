@@ -69,7 +69,7 @@ test:
 
 test-functional:
 	go mod vendor
-	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -kubeurl="" -kubeconfig="../_ci-configs/$(KUBEVIRT_PROVIDER)/.kubeconfig"
+	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -kubeconfig="../_ci-configs/$(KUBEVIRT_PROVIDER)/.kubeconfig"
 
 test-sanity:
-	DOCKER_REPO=${DOCKER_REPO} hack/sanity.sh
+	GOLANG_VER=${GOLANG_VER} DOCKER_REPO=${DOCKER_REPO} hack/sanity.sh

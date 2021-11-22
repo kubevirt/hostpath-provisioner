@@ -4,35 +4,35 @@ go 1.16
 
 require (
 	github.com/container-storage-interface/spec v1.5.0
-	github.com/fatih/color v1.13.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/protobuf v1.5.2
 	github.com/kubernetes-csi/csi-lib-utils v0.10.0
 	github.com/kubernetes-csi/csi-test/v4 v4.2.0
-	github.com/mattn/go-colorable v0.1.11 // indirect
-	github.com/onsi/gomega v1.10.4
-	github.com/prometheus/client_golang v1.7.1
-	golang.org/x/mod v0.5.1 // indirect
+	github.com/onsi/ginkgo v1.16.5 // indirect
+	github.com/onsi/gomega v1.15.0
+	github.com/prometheus/client_golang v1.11.0
 	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
 	golang.org/x/sys v0.0.0-20211004093028-2c5d950f24ef
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
-	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
-	golang.org/x/tools v0.1.7 // indirect
+	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	google.golang.org/grpc v1.38.0
 	gotest.tools/gotestsum v1.7.0 // indirect
-	k8s.io/api v0.22.0
-	k8s.io/apimachinery v0.21.2
+	k8s.io/api v0.22.2
+	k8s.io/apimachinery v0.22.2
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/kubernetes v1.21.2
-	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
-	kubevirt.io/hostpath-provisioner-operator v0.9.0
+	k8s.io/utils v0.0.0-20210802155522-efc7438f0176
+	kubevirt.io/hostpath-provisioner-operator v0.11.0
+	sigs.k8s.io/controller-runtime v0.10.0
 	sigs.k8s.io/sig-storage-lib-external-provisioner/v6 v6.0.0
 )
 
 replace (
+	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.12.1
+	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 	k8s.io/api => k8s.io/api v0.21.2
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.21.2
 	k8s.io/apimachinery => k8s.io/apimachinery v0.21.2

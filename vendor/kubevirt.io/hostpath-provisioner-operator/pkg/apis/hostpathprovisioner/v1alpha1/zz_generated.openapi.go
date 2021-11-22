@@ -60,17 +60,20 @@ func schema_pkg_apis_hostpathprovisioner_v1alpha1_HostPathProvisioner(ref common
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1alpha1.HostPathProvisionerSpec"),
+							Default: map[string]interface{}{},
+							Ref:     ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1alpha1.HostPathProvisionerSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1alpha1.HostPathProvisionerStatus"),
+							Default: map[string]interface{}{},
+							Ref:     ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1alpha1.HostPathProvisionerStatus"),
 						},
 					},
 				},
@@ -98,12 +101,14 @@ func schema_pkg_apis_hostpathprovisioner_v1alpha1_HostPathProvisionerSpec(ref co
 					"pathConfig": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PathConfig describes the location and layout of PV storage on nodes",
+							Default:     map[string]interface{}{},
 							Ref:         ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1alpha1.PathConfig"),
 						},
 					},
 					"workload": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Restrict on which nodes HPP workload pods will be scheduled",
+							Default:     map[string]interface{}{},
 							Ref:         ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1alpha1.NodePlacement"),
 						},
 					},
@@ -126,7 +131,7 @@ func schema_pkg_apis_hostpathprovisioner_v1alpha1_HostPathProvisionerStatus(ref 
 					"conditions": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "set",
+								"x-kubernetes-list-type": "atomic",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -135,7 +140,8 @@ func schema_pkg_apis_hostpathprovisioner_v1alpha1_HostPathProvisionerStatus(ref 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/openshift/custom-resource-status/conditions/v1.Condition"),
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/openshift/custom-resource-status/conditions/v1.Condition"),
 									},
 								},
 							},
@@ -185,8 +191,9 @@ func schema_pkg_apis_hostpathprovisioner_v1alpha1_NodePlacement(ref common.Refer
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
 									},
 								},
 							},
@@ -205,7 +212,8 @@ func schema_pkg_apis_hostpathprovisioner_v1alpha1_NodePlacement(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/api/core/v1.Toleration"),
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/core/v1.Toleration"),
 									},
 								},
 							},

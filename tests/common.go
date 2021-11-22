@@ -19,7 +19,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -35,12 +34,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-)
-
-var (
-	kubeConfig  = flag.String("kubeconfig", "/var/run/kubernetes/admin.kubeconfig", "The absolute path to the kubeconfig file")
-	kubeURL     = flag.String("kubeurl", "", "kube URL url:port")
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 // Common allocation units
@@ -97,7 +91,7 @@ func getAllNodes(k8sClient *kubernetes.Clientset) (*corev1.NodeList, error) {
 
 // getHPPClient returns a HPP rest client
 func getHPPClient() (*hostpathprovisioner.Clientset, error) {
-	cfg, err := clientcmd.BuildConfigFromFlags(*kubeURL, *kubeConfig)
+	cfg, err := config.GetConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +100,7 @@ func getHPPClient() (*hostpathprovisioner.Clientset, error) {
 
 // getKubeClient returns a Kubernetes rest client
 func getKubeClient() (*kubernetes.Clientset, error) {
-	cmd, err := clientcmd.BuildConfigFromFlags(*kubeURL, *kubeConfig)
+	cmd, err := config.GetConfig()
 	if err != nil {
 		return nil, err
 	}
