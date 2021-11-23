@@ -298,7 +298,7 @@ func Test_DeleteVolumeRequestInvalidPath(t *testing.T) {
 	controller := createControllerServer("/dev")
 
 	_, err := controller.DeleteVolume(context.TODO(), &csi.DeleteVolumeRequest{
-		VolumeId: "cpu",
+		VolumeId: "net",
 	})
 	Expect(err).To(HaveOccurred())
 }
