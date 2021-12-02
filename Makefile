@@ -73,3 +73,9 @@ test-functional:
 
 test-sanity:
 	DOCKER_REPO=${DOCKER_REPO} hack/sanity.sh
+
+generate-doc: build-docgen
+	_out/metricsdocs > docs/metrics.md
+
+build-docgen:
+	go build -ldflags="-s -w" -o _out/metricsdocs ./tools/metricsdocs

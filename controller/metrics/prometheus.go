@@ -23,6 +23,7 @@ import (
 	"net/http"
 )
 
+// Handler creates a new prometheus handler to receive scrap requests
 func Handler(MaxRequestsInFlight int) http.Handler {
 	return promhttp.InstrumentMetricHandler(
 		prometheus.DefaultRegisterer,
@@ -34,15 +35,18 @@ func Handler(MaxRequestsInFlight int) http.Handler {
 	)
 }
 
-func NewPrometheusScraper(ch chan<- prometheus.Metric) *prometheusScraper {
-	return &prometheusScraper{ch: ch}
+// NewPrometheusScraper returns a new struct of the prometheus scrapper
+func NewPrometheusScraper(ch chan<- prometheus.Metric) *PrometheusScraper {
+	return &PrometheusScraper{ch: ch}
 }
 
-type prometheusScraper struct {
+// PrometheusScraper struct containing the resources to scrap prometheus metrics
+type PrometheusScraper struct {
 	ch chan<- prometheus.Metric
 }
 
-func (ps *prometheusScraper) Report(socketFile string) {
+// Report adds CDI metrics to PrometheusScraper
+func (ps *PrometheusScraper) Report(socketFile string) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Panicf("collector goroutine panicked for VM %s: %s", socketFile, err)
@@ -59,13 +63,13 @@ func (ps *prometheusScraper) Report(socketFile string) {
 	ps.describeVec(descCh, PersistentVolumeDeleteDurationSeconds)
 }
 
-func (ps *prometheusScraper) describeVec(descCh chan *prometheus.Desc, vec prometheus.Collector) {
+func (ps *PrometheusScraper) describeVec(descCh chan *prometheus.Desc, vec prometheus.Collector) {
 	go vec.Describe(descCh)
 	desc := <-descCh
 	ps.newMetric(desc)
 }
 
-func (ps *prometheusScraper) newMetric(desc *prometheus.Desc) {
+func (ps *PrometheusScraper) newMetric(desc *prometheus.Desc) {
 	mv, err := prometheus.NewConstMetric(desc, prometheus.UntypedValue, 1024, "")
 	if err != nil {
 		panic(err)
