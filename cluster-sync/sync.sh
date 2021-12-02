@@ -77,14 +77,14 @@ echo "Deploying"
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/operator.yaml -n ${HPP_NAMESPACE}
 
 echo "Waiting for it to be ready"
-_kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=30s
+_kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=120s
 
 echo "Updating deployment"
 _kubectl get pods -n hostpath-provisioner
 # patch the correct development image name.
 _kubectl patch deployment hostpath-provisioner-operator -n hostpath-provisioner --patch-file cluster-sync/patch.yaml
 
-_kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=30s
+_kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=120s
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/hostpathprovisioner_legacy_cr.yaml
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc.yaml
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-legacy-csi.yaml

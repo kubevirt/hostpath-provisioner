@@ -34,6 +34,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.HostPathProvisionerStatus": schema_pkg_apis_hostpathprovisioner_v1beta1_HostPathProvisionerStatus(ref),
 		"kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.NodePlacement":             schema_pkg_apis_hostpathprovisioner_v1beta1_NodePlacement(ref),
 		"kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.PathConfig":                schema_pkg_apis_hostpathprovisioner_v1beta1_PathConfig(ref),
+		"kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.StoragePool":               schema_pkg_apis_hostpathprovisioner_v1beta1_StoragePool(ref),
 	}
 }
 
@@ -60,17 +61,20 @@ func schema_pkg_apis_hostpathprovisioner_v1beta1_HostPathProvisioner(ref common.
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.HostPathProvisionerSpec"),
+							Default: map[string]interface{}{},
+							Ref:     ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.HostPathProvisionerSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.HostPathProvisionerStatus"),
+							Default: map[string]interface{}{},
+							Ref:     ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.HostPathProvisionerStatus"),
 						},
 					},
 				},
@@ -97,22 +101,61 @@ func schema_pkg_apis_hostpathprovisioner_v1beta1_HostPathProvisionerSpec(ref com
 					},
 					"pathConfig": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PathConfig describes the location and layout of PV storage on nodes",
+							Description: "PathConfig describes the location and layout of PV storage on nodes. Deprecated",
 							Ref:         ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.PathConfig"),
 						},
 					},
 					"workload": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Restrict on which nodes HPP workload pods will be scheduled",
+							Default:     map[string]interface{}{},
 							Ref:         ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.NodePlacement"),
 						},
 					},
+					"featureGates": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "FeatureGates are a list of specific enabled feature gates",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"storagePools": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "StoragePools are a list of storage pools",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.StoragePool"),
+									},
+								},
+							},
+						},
+					},
 				},
-				Required: []string{"pathConfig"},
 			},
 		},
 		Dependencies: []string{
-			"kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.NodePlacement", "kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.PathConfig"},
+			"kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.NodePlacement", "kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.PathConfig", "kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.StoragePool"},
 	}
 }
 
@@ -126,7 +169,7 @@ func schema_pkg_apis_hostpathprovisioner_v1beta1_HostPathProvisionerStatus(ref c
 					"conditions": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "set",
+								"x-kubernetes-list-type": "atomic",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -135,7 +178,8 @@ func schema_pkg_apis_hostpathprovisioner_v1beta1_HostPathProvisionerStatus(ref c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/openshift/custom-resource-status/conditions/v1.Condition"),
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/openshift/custom-resource-status/conditions/v1.Condition"),
 									},
 								},
 							},
@@ -162,11 +206,29 @@ func schema_pkg_apis_hostpathprovisioner_v1beta1_HostPathProvisionerStatus(ref c
 							Format:      "",
 						},
 					},
+					"storagePoolStatuses": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.StoragePoolStatus"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/openshift/custom-resource-status/conditions/v1.Condition"},
+			"github.com/openshift/custom-resource-status/conditions/v1.Condition", "kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1.StoragePoolStatus"},
 	}
 }
 
@@ -185,8 +247,9 @@ func schema_pkg_apis_hostpathprovisioner_v1beta1_NodePlacement(ref common.Refere
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
 									},
 								},
 							},
@@ -205,7 +268,8 @@ func schema_pkg_apis_hostpathprovisioner_v1beta1_NodePlacement(ref common.Refere
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/api/core/v1.Toleration"),
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/core/v1.Toleration"),
 									},
 								},
 							},
@@ -223,7 +287,7 @@ func schema_pkg_apis_hostpathprovisioner_v1beta1_PathConfig(ref common.Reference
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PathConfig contains the information needed to build the path where the PVs will be created.",
+				Description: "PathConfig contains the information needed to build the path where the PVs will be created. Deprecated",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"path": {
@@ -243,5 +307,43 @@ func schema_pkg_apis_hostpathprovisioner_v1beta1_PathConfig(ref common.Reference
 				},
 			},
 		},
+	}
+}
+
+func schema_pkg_apis_hostpathprovisioner_v1beta1_StoragePool(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "StoragePool defines how and where hostpath provisioner can use storage to create volumes.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name specifies an identifier that is used in the storage class arguments to identify the source to use.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"pvcTemplate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PVCTemplate is the template of the PVC to create as the source volume",
+							Ref:         ref("k8s.io/api/core/v1.PersistentVolumeClaimSpec"),
+						},
+					},
+					"path": {
+						SchemaProps: spec.SchemaProps{
+							Description: "path the path to use on the host, this is a required field",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "path"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/core/v1.PersistentVolumeClaimSpec"},
 	}
 }

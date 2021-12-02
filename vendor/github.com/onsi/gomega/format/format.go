@@ -105,13 +105,7 @@ func MessageWithDiff(actual, message, expected string) string {
 
 		tabLength := 4
 		spaceFromMessageToActual := tabLength + len("<string>: ") - len(message)
-
-		paddingCount := spaceFromMessageToActual + spacesBeforeFormattedMismatch
-		if paddingCount < 0 {
-			return Message(formattedActual, message, formattedExpected)
-		}
-
-		padding := strings.Repeat(" ", paddingCount) + "|"
+		padding := strings.Repeat(" ", spaceFromMessageToActual+spacesBeforeFormattedMismatch) + "|"
 		return Message(formattedActual, message+padding, formattedExpected)
 	}
 

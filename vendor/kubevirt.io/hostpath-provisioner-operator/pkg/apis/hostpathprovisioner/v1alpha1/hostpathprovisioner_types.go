@@ -30,14 +30,14 @@ type HostPathProvisionerSpec struct {
 	// PathConfig describes the location and layout of PV storage on nodes
 	PathConfig PathConfig `json:"pathConfig" valid:"required"`
 	// Restrict on which nodes HPP workload pods will be scheduled
-	Workloads NodePlacement `json:"workload,omitempty"`
+	Workload NodePlacement `json:"workload,omitempty"`
 }
 
 // HostPathProvisionerStatus defines the observed state of HostPathProvisioner
 // +k8s:openapi-gen=true
 type HostPathProvisionerStatus struct {
 	// Conditions contains the current conditions observed by the operator
-	// +listType=set
+	// +listType=atomic
 	Conditions []conditions.Condition `json:"conditions,omitempty" optional:"true"`
 	// OperatorVersion The version of the HostPathProvisioner Operator
 	OperatorVersion string `json:"operatorVersion,omitempty" optional:"true"`
