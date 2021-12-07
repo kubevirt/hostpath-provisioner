@@ -117,6 +117,14 @@ echo $hpp_obj
 exit 1
 fi
 
+function configure_prometheus {
+  if _kubectl get crd prometheuses.monitoring.coreos.com; then
+    _kubectl patch prometheus k8s -n monitoring --type=json -p '[{"op": "replace", "path": "/spec/ruleSelector", "value":{}}, {"op": "replace", "path": "/spec/ruleNamespaceSelector", "value":{"matchLabels": {"kubernetes.io/metadata.name": "hostpath-provisioner"}}}]'
+  fi
+}
+
+configure_prometheus
+
 function check_structural_schema {
   for crd in "$@"; do
     status=$(_kubectl get crd $crd -o jsonpath={.status.conditions[?\(@.type==\"NonStructuralSchema\"\)].status})

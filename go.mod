@@ -19,6 +19,7 @@ require (
 	google.golang.org/grpc v1.38.0
 	gotest.tools/gotestsum v1.7.0 // indirect
 	k8s.io/api v0.22.2
+	k8s.io/apiextensions-apiserver v0.22.2
 	k8s.io/apimachinery v0.22.2
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/klog v1.0.0

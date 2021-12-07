@@ -159,7 +159,7 @@ func TestPVCSize(t *testing.T) {
 		}
 	}()
 
-	dfString, err := RunGoCLICommand("../cluster-up/ssh.sh", "node01", "df -Bk /var/hpvolumes | sed 1d")
+	dfString, err := RunNodeSSHCommand("node01", "df -Bk /var/hpvolumes | sed 1d")
 	Expect(err).ToNot(HaveOccurred())
 	sizeQuantity := resource.MustParse(strings.ToLower(strings.Fields(dfString)[1]))
 	int64Size, _ := sizeQuantity.AsInt64()
