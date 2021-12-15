@@ -34,6 +34,7 @@ const (
 	csiStorageClassName = "hostpath-csi"
 	legacyStorageClassName = "hostpath-provisioner"
 	legacyStorageClassNameImmediate = "hostpath-provisioner-immediate"
+	testMountName = "testmount"
 )
 func TestCreatePVCOnNode1(t *testing.T) {
 	RegisterTestingT(t)
@@ -210,6 +211,55 @@ func TestPVCSize(t *testing.T) {
 
 }
 
+func TestFsGroup(t *testing.T) {
+	RegisterTestingT(t)
+	tearDown, ns, k8sClient := setupTestCaseNs(t)
+	defer tearDown(t)
+	annotations := make(map[string]string)
+
+	pvc := createPVCDef(ns.Name, legacyStorageClassName, annotations)
+	defer func() {
+		// Cleanup
+		if pvc != nil {
+			t.Logf("Removing PVC: %s", pvc.Name)
+			err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		}
+	}()
+	t.Logf("Creating PVC: %s", pvc.Name)
+	pvc, err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
+	Expect(err).ToNot(HaveOccurred())
+
+	Eventually(func() corev1.PersistentVolumeClaimPhase {
+		pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		return pvc.Status.Phase
+	}, 90*time.Second, 1*time.Second).Should(BeEquivalentTo(corev1.ClaimPending))
+
+	Expect(pvc.Spec.VolumeName).To(BeEmpty())
+
+	touchPod := createPodUsingPVCWithFsGroup(ns.Name, "touch-pod", pvc, "touch /data/test.txt", 2000, annotations)
+	touchPod, err = k8sClient.CoreV1().Pods(ns.Name).Create(context.TODO(), touchPod, metav1.CreateOptions{})
+	Expect(err).ToNot(HaveOccurred())
+	Eventually(func() bool {
+		touchPod, err = k8sClient.CoreV1().Pods(ns.Name).Get(context.TODO(), touchPod.Name, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		return touchPod.Status.Phase == corev1.PodRunning || touchPod.Status.Phase == corev1.PodSucceeded
+	}, 90*time.Second, 1*time.Second).Should(BeTrue())
+	getPod := createPodUsingPVCWithFsGroup(ns.Name, "get-pod", pvc, "ls -al /data/test.txt", 2000, annotations)
+	getPod, err = k8sClient.CoreV1().Pods(ns.Name).Create(context.TODO(), getPod, metav1.CreateOptions{})
+	Expect(err).ToNot(HaveOccurred())
+	Eventually(func() string {
+		getPod, err = k8sClient.CoreV1().Pods(ns.Name).Get(context.TODO(), getPod.Name, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		out ,err := RunKubeCtlCommand("logs", getPod.GetName(), "-n", ns.Name)
+		if err != nil {
+			return ""
+		}
+		return out
+	}, 90*time.Second, 1*time.Second).Should(ContainSubstring("-rw-r--r--. 1 1000 2000"))
+}
+
 func createPVCDef(namespace, storageClassName string, annotations map[string]string) *corev1.PersistentVolumeClaim {
 	return &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -232,9 +282,13 @@ func createPVCDef(namespace, storageClassName string, annotations map[string]str
 }
 
 func createPodUsingPVC(namespace string, pvc *corev1.PersistentVolumeClaim, annotations map[string]string) *corev1.Pod {
+	return createPodUsingPVCWithCommand(namespace, "test-pod", pvc, "sleep 1", annotations)
+}
+
+func createPodUsingPVCWithCommand(namespace, name string, pvc *corev1.PersistentVolumeClaim, command string, annotations map[string]string) *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "test-pod",
+			Name:        name,
 			Namespace:   namespace,
 			Annotations: annotations,
 		},
@@ -243,13 +297,19 @@ func createPodUsingPVC(namespace string, pvc *corev1.PersistentVolumeClaim, anno
 			Containers: []corev1.Container{
 				{
 					Name:    "runner",
-					Image:   "kubevirt/cdi-importer:latest",
-					Command: []string{"/bin/sh", "-c", "sleep 1"},
+					Image:   "quay.io/kubevirt/cdi-importer:latest",
+					Command: []string{"/bin/sh", "-c", command},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name: testMountName,
+							MountPath: "/data",
+						},
+					},
 				},
 			},
 			Volumes: []corev1.Volume{
 				{
-					Name: pvc.GetName(),
+					Name: testMountName,
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 							ClaimName: pvc.GetName(),
@@ -259,6 +319,17 @@ func createPodUsingPVC(namespace string, pvc *corev1.PersistentVolumeClaim, anno
 			},
 		},
 	}
+}
+
+func createPodUsingPVCWithFsGroup(namespace, name string, pvc *corev1.PersistentVolumeClaim, command string, groupId int64, annotations map[string]string) *corev1.Pod {
+	userId := int64(1000)
+	pod := createPodUsingPVCWithCommand(namespace, name, pvc, command, annotations)
+	pod.Spec.SecurityContext = &corev1.PodSecurityContext{
+		RunAsUser: &userId,
+		RunAsGroup: &groupId,
+		FSGroup: &groupId,
+	}
+	return pod
 }
 
 func getHostpathPVs(allPvs []corev1.PersistentVolume) []corev1.PersistentVolume {
