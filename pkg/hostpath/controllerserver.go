@@ -18,9 +18,7 @@ package hostpath
 
 import (
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
-	"sort"
 
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"golang.org/x/net/context"
@@ -172,7 +170,7 @@ func (hpc *hostPathController) DeleteVolume(ctx context.Context, req *csi.Delete
 	}
 	if volumePath != "" {
 		if err := DeleteVolume(filepath.Dir(volumePath), req.GetVolumeId()); err != nil {
-			return nil, fmt.Errorf("failed to delete volume %v: %w", req.GetVolumeId(), err)
+			return nil, fmt.Errorf("failed to delete volume %s: %v", req.GetVolumeId(), err)
 		}
 		klog.V(4).Infof("volume %v successfully deleted", req.GetVolumeId())
 	}
@@ -245,20 +243,7 @@ func (hpc *hostPathController) GetCapacity(ctx context.Context, req *csi.GetCapa
 }
 
 func (hpc *hostPathController) getVolumeDirectories() ([]string, error) {
-	directories := make([]string, 0)
-	for _, path := range hpc.cfg.StoragePoolDataDir {
-		files, err := ioutil.ReadDir(path)
-		if err != nil {
-			return nil, err
-		}
-		for _, file := range files {
-			if file.IsDir() {
-				directories = append(directories, filepath.Join(path, file.Name()))
-			}
-		}
-	}
-	sort.Strings(directories)
-	return directories, nil
+	return getVolumeDirectories(hpc.cfg.StoragePoolDataDir)
 }
 
 func (hpc *hostPathController) validateListVolumesRequest(req *csi.ListVolumesRequest) error {

@@ -16,8 +16,10 @@ limitations under the License.
 package hostpath
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"k8s.io/klog/v2"
 )
@@ -105,4 +107,21 @@ func getStoragePoolNameFromMap(params map[string]string) string {
 		return params[storagePoolName]
 	}
 	return legacyStoragePoolName
+}
+
+func getVolumeDirectories(storagePoolDataDirs map[string]string) ([]string, error) {
+	directories := make([]string, 0)
+	for _, path := range storagePoolDataDirs {
+		files, err := ioutil.ReadDir(path)
+		if err != nil {
+			return nil, err
+		}
+		for _, file := range files {
+			if file.IsDir() {
+				directories = append(directories, filepath.Join(path, file.Name()))
+			}
+		}
+	}
+	sort.Strings(directories)
+	return directories, nil
 }

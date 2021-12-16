@@ -29,7 +29,10 @@ import (
 	"k8s.io/utils/mount"
 )
 
-const TopologyKeyNode = "topology.hostpath.csi/node"
+const (
+	TopologyKeyNode = "topology.hostpath.csi/node"
+	ephemeralContextKey = "csi.storage.k8s.io/ephemeral"
+)
 
 type hostPathNode struct {
 	cfg *Config
@@ -135,7 +138,15 @@ func (hpn *hostPathNode) mountVolume(targetPath string, req *csi.NodePublishVolu
 	storagePoolName := getStoragePoolNameFromMap(req.GetVolumeContext())
 
 	mounter := hpn.cfg.Mounter
-	path := filepath.Join(hpn.cfg.StoragePoolDataDir[storagePoolName], volumeId)
+	path := ""
+	if isEphemeralVolumeRequest(req) {
+		path = hpn.getEphemeralVolumePath(storagePoolName, volumeId)
+		if err := CreateVolume(filepath.Dir(path), volumeId); err != nil {
+			return fmt.Errorf("failed to create ephemeral volume %v: %w", volumeId, err)
+		}
+	} else {
+		path = filepath.Join(hpn.cfg.StoragePoolDataDir[storagePoolName], volumeId)
+	}
 
 	if err := mounter.Mount(path, targetPath, fsType, options); err != nil {
 		var errList strings.Builder
@@ -145,9 +156,31 @@ func (hpn *hostPathNode) mountVolume(targetPath string, req *csi.NodePublishVolu
 			errList.WriteString(err.Error())
 		}
 		errList.WriteString(fmt.Sprintf("%v", fileInfo.Mode()))
+		if isEphemeralVolumeRequest(req) {
+			if rmErr := os.RemoveAll(path); rmErr != nil && !os.IsNotExist(rmErr) {
+				errList.WriteString(fmt.Sprintf(" :%s", rmErr.Error()))
+			}
+		}
+
 		return fmt.Errorf("failed to mount device: %s at %s: %s", path, targetPath, errList.String())
 	}
 	return nil
+}
+
+func isEphemeralVolumeRequest(req *csi.NodePublishVolumeRequest) bool {
+	return req.GetVolumeContext()[ephemeralContextKey] == "true"
+}
+
+func isEphemeralVolumeId(volumeId string) bool {
+	return strings.HasPrefix(volumeId, "csi")
+}
+
+func (hpn *hostPathNode) getEphemeralVolumePath(storagePoolName, volumeId string) string {
+	storagePoolPath := hpn.cfg.StoragePoolDataDir[storagePoolName]
+	if len(storagePoolPath) == 0 {
+		storagePoolPath = hpn.cfg.StoragePoolDataDir[hpn.cfg.DefaultStoragePoolName]
+	}
+	return filepath.Join(storagePoolPath, volumeId)
 }
 
 func (hpn *hostPathNode) validateNodeUnpublishRequest(req *csi.NodeUnpublishVolumeRequest) error {
@@ -162,6 +195,9 @@ func (hpn *hostPathNode) validateNodeUnpublishRequest(req *csi.NodeUnpublishVolu
 }
 
 func (hpn *hostPathNode) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
+	if req != nil {
+		klog.V(3).Infof("Node Unpublish Request: %+v", *req)
+	}
 	if err := hpn.validateNodeUnpublishRequest(req); err != nil {
 		return nil, err
 	}
@@ -188,8 +224,36 @@ func (hpn *hostPathNode) NodeUnpublishVolume(ctx context.Context, req *csi.NodeU
 		return nil, fmt.Errorf("remove target path: %w", err)
 	}
 	klog.V(4).Infof("hostpath: volume %s has been unpublished.", targetPath)
-
+	if isEphemeralVolumeId(req.GetVolumeId()) {
+		if err := hpn.removeEphemeralPath(req.GetVolumeId()); err != nil {
+			return nil, fmt.Errorf("failed to delete ephemeral volume: %s, %v", req.GetVolumeId(), err)
+		}
+	}
 	return &csi.NodeUnpublishVolumeResponse{}, nil
+}
+
+func (hpn *hostPathNode) removeEphemeralPath(volumeId string) error {
+	volumeDirs, err := hpn.getVolumeDirectories()
+	if err != nil {
+		return err
+	}
+	volumePath := ""
+	for _, volumeDir := range volumeDirs {
+		if filepath.Base(volumeDir) == volumeId {
+			volumePath = volumeDir
+		}
+	}
+	if volumePath != "" {
+		if err := DeleteVolume(filepath.Dir(volumePath), volumeId); err != nil {
+			return fmt.Errorf("failed to delete ephemeral volume %s: %v", volumeId, err)
+		}
+		klog.V(4).Infof("ephemeral volume %v successfully deleted", volumeId)
+	}
+	return nil
+}
+
+func (hpn *hostPathNode) getVolumeDirectories() ([]string, error) {
+	return getVolumeDirectories(hpn.cfg.StoragePoolDataDir)
 }
 
 func (hpn *hostPathNode) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {

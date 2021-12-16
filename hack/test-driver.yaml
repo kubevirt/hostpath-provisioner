@@ -19,3 +19,6 @@ DriverInfo:
     capacity: true
   TopologyKeys:
   - topology.hostpath.csi/node
+InlineVolumes:
+- shared: true
+
