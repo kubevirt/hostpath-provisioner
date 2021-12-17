@@ -39,6 +39,7 @@ type Config struct {
 	Endpoint              string
 	NodeID                string
 	StoragePoolDataDir			map[string]string
+	DefaultStoragePoolName string
 	Version	       		  string
 	Mounter mount.Interface
 }
@@ -68,13 +69,16 @@ func NewHostPathDriver(cfg *Config, dataDir string) (*hostPath, error) {
 	if cfg.Mounter == nil {
 		cfg.Mounter = mount.New("")
 	}
-	cfg.StoragePoolDataDir = make(map[string]string, 0)
+	cfg.StoragePoolDataDir = make(map[string]string)
 
 	storagePools := make([]StoragePoolInfo, 0)
 	if err := json.Unmarshal([]byte(dataDir), &storagePools); err != nil {
 		return nil, errors.New("unable to parse storage pool info")
 	}
 	for _, storagePool := range storagePools {
+		if len(cfg.DefaultStoragePoolName) == 0 {
+			cfg.DefaultStoragePoolName = storagePool.Name
+		}
 		cfg.StoragePoolDataDir[storagePool.Name] = storagePool.Path
 	}
 

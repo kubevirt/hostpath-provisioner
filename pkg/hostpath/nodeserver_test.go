@@ -387,6 +387,64 @@ func Test_NodePublishVolumeValidMountPoint(t *testing.T) {
 	Expect(mountPoint.Opts).To(ContainElement("bind"))
 }
 
+func Test_NodePublishVolumeEphemeral(t *testing.T) {
+	RegisterTestingT(t)
+	tempDir, err := ioutil.TempDir(os.TempDir(), "")
+	Expect(err).ToNot(HaveOccurred())
+	defer os.RemoveAll(tempDir)
+	nodeServer := createNodeServer(testNode)
+	fakeMounter := mount.NewFakeMounter([]mount.MountPoint{})
+	nodeServer.cfg.Mounter = fakeMounter
+	nodeServer.cfg.DefaultStoragePoolName = "test"
+	nodeServer.cfg.StoragePoolDataDir = make(map[string]string)
+	nodeServer.cfg.StoragePoolDataDir["test"] = tempDir
+	_, err = nodeServer.NodePublishVolume(context.TODO(), &csi.NodePublishVolumeRequest{
+		VolumeId: "csi-abcd",
+		VolumeContext: map[string]string{
+			ephemeralContextKey: "true",
+		},
+		TargetPath: filepath.Join(tempDir, validVolId),
+		VolumeCapability: &csi.VolumeCapability{
+			AccessType: &csi.VolumeCapability_Mount{
+				Mount: &csi.VolumeCapability_MountVolume{
+					FsType: "ext4",
+				},
+			},
+		},
+	})
+	Expect(err).ToNot(HaveOccurred())
+	info, err := os.Stat(filepath.Join(tempDir, "csi-abcd"))
+	Expect(err).ToNot(HaveOccurred())
+	Expect(info.IsDir()).To(BeTrue())
+	Expect(len(fakeMounter.GetLog())).To(Equal(1))
+	mountAction := fakeMounter.GetLog()[0]
+	Expect(mountAction.Action).To(Equal(mount.FakeActionMount))
+	Expect(mountAction.Target).To(Equal(filepath.Join(tempDir, validVolId)))
+	Expect(mountAction.Source).To(Equal(filepath.Join(tempDir, "csi-abcd")))
+	Expect(mountAction.FSType).To(Equal("ext4"))
+	Expect(len(fakeMounter.MountPoints)).To(Equal(1))
+	mountPoint := fakeMounter.MountPoints[0]
+	Expect(mountPoint.Opts).To(ContainElement("bind"))
+	t.Log("Unpublish ephemeral")
+	_, err = nodeServer.NodeUnpublishVolume(context.TODO(), &csi.NodeUnpublishVolumeRequest{
+		VolumeId: "csi-abcd",
+		TargetPath: filepath.Join(tempDir, validVolId),
+	})
+	Expect(err).ToNot(HaveOccurred())
+	_, err = os.Stat(filepath.Join(tempDir, "csi-abcd"))
+	Expect(err).To(HaveOccurred())
+	Expect(os.IsNotExist(err)).To(BeTrue())
+	t.Log("Unpublish ephemeral again")
+	_, err = nodeServer.NodeUnpublishVolume(context.TODO(), &csi.NodeUnpublishVolumeRequest{
+		VolumeId: "csi-abcd",
+		TargetPath: filepath.Join(tempDir, validVolId),
+	})
+	Expect(err).ToNot(HaveOccurred())
+	_, err = os.Stat(filepath.Join(tempDir, "csi-abcd"))
+	Expect(err).To(HaveOccurred())
+	Expect(os.IsNotExist(err)).To(BeTrue())
+}
+
 func Test_NodePublishVolumeValidMountPointReadOnly(t *testing.T) {
 	RegisterTestingT(t)
 	tempDir, err := ioutil.TempDir(os.TempDir(), "")
