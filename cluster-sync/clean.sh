@@ -25,5 +25,5 @@ fi
 
 _kubectl delete -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/operator.yaml -n hostpath-provisioner --ignore-not-found
 _kubectl delete -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/namespace.yaml --ignore-not-found
-_kubectl delete -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/storageclass-wffc.yaml --ignore-not-found
+_kubectl delete -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/storageclass-wffc-legacy.yaml --ignore-not-found
 _kubectl delete -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/master/deploy/storageclass-immediate.yaml --ignore-not-found

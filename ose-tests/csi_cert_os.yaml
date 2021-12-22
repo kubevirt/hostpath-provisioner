@@ -1,0 +1,78 @@
+ShortName: hpp
+StorageClass:
+  # Load a StorageClass from the given file. This file must be in the same directory as this one
+  FromFile: storageclass.yaml
+
+SnapshotClass:
+  # Must be set to enable snapshotting tests
+  FromName: true
+
+DriverInfo:
+  # Internal name of the driver, this is used as a display name in the test case and test objects
+  Name: kubevirt.io.hostpath-provisioner 
+
+  # The range of disk size supported by this driver
+  SupportedSizeRange:
+    Min: 1Gi
+    Max: 16Ti
+
+  # Map of strings for supported FS types
+  SupportedFsType:
+    xfs: {}
+
+  # Map of strings for supported mount options
+  SupportedMountOption:
+
+  # Optional list of topology keys that the driver supports
+  TopologyKeys: ["topology.hostpath.csi/node"]
+
+  # Optional number of allowed topologies that the driver requires. Only relevenat if TopologyKeys is set
+  NumAllowedTopologies: 1
+
+  # Map of strings for required mount options
+  # RequiredMountOption:
+
+  # Optional list of access modes required for provisiong. Default is RWO
+  # RequiredAccessModes:
+
+  # Map that represents the capabilities the driver supports
+  Capabilities:
+    # Data is persistest accross pod restarts
+    persistence: true
+
+    # Volume ownership via fsGroup
+    fsGroup: true
+
+    # Raw block mode
+    block: false
+
+    # Exec a file in the volume
+    exec: true
+
+    # Support for volume limits
+    volumeLimits: false
+
+    # Support for volume expansion in controllers
+    controllerExpansion: false
+
+    # Support for volume expansion in nodes
+    nodeExpansion: false
+
+    # Support volume that an run on single node only (like hostpath)
+    singleNodeVolume: false
+
+    # Support ReadWriteMany access modes
+    RWX: false
+
+    # Support topology
+    topology: true
+
+    # Support populate data from snapshot
+    snapshotDataSource: false
+
+    # Support populated data from PVC
+    pvcDataSource: false
+
+InlineVolumes:
+- shared: true
+
