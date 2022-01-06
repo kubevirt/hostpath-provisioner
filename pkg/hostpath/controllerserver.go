@@ -75,15 +75,52 @@ func (hpc *hostPathController) validateCreateVolumeRequestTopology(req *csi.Crea
 	if req.AccessibilityRequirements != nil {
 		for _, requisite := range req.AccessibilityRequirements.Requisite {
 			if requisite.Segments[TopologyKeyNode] == hpc.cfg.NodeID {
+				if req.GetVolumeContentSource() != nil {
+					return hpc.validateContentSourceTopology(req)
+				}
 				return nil
 			}
 		}
 		for _, preferred := range req.AccessibilityRequirements.Preferred {
 			if preferred.Segments[TopologyKeyNode] == hpc.cfg.NodeID {
+				if req.GetVolumeContentSource() != nil {
+					return hpc.validateContentSourceTopology(req)
+				}
 				return nil
 			}
 		}
 		return status.Error(codes.InvalidArgument, "not correct node")
+	}
+	if req.GetVolumeContentSource() != nil {
+		return hpc.validateContentSourceTopology(req)
+	}
+	return nil
+}
+
+func (hpc *hostPathController) validateContentSourceTopology(req *csi.CreateVolumeRequest) error {
+	// Ensure that the content source is on the same node
+	if req.GetVolumeContentSource() != nil {
+		volumeDirs, err := hpc.getVolumeDirectories()
+		if err != nil {
+			return err
+		}
+		source := req.GetVolumeContentSource()
+		switch source.Type.(type) {
+			case *csi.VolumeContentSource_Volume:
+				if volume := source.GetVolume(); volume != nil {
+					volumePath := ""
+					for _, volumeDir := range volumeDirs {
+						if filepath.Base(volumeDir) == volume.GetVolumeId() {
+							volumePath = volumeDir
+						}
+					}
+					if len(volumePath) == 0 {
+						return status.Error(codes.NotFound, "source not on node")
+					}
+				}
+			default:
+				return status.Error(codes.NotFound, "source specified, but unsupported source")
+		}
 	}
 	return nil
 }
@@ -119,7 +156,31 @@ func (hpc *hostPathController) CreateVolume(ctx context.Context, req *csi.Create
 			return nil, fmt.Errorf("failed to create volume %v: %w", req.GetName(), err)
 		}
 		klog.V(4).Infof("created volume %s at path %s", req.GetName(), filepath.Join(hpc.cfg.StoragePoolDataDir[storagePoolName], req.GetName()))
-	}	
+	}
+
+	if req.GetVolumeContentSource() != nil {
+		volumeDirs, err := hpc.getVolumeDirectories()
+		if err != nil {
+			return nil, err
+		}
+		source := req.GetVolumeContentSource()
+		switch source.Type.(type) {
+			case *csi.VolumeContentSource_Volume:
+				if volume := source.GetVolume(); volume != nil {
+					sourcePath := ""
+					for _, volumeDir := range volumeDirs {
+						if filepath.Base(volumeDir) == volume.GetVolumeId() {
+							sourcePath = volumeDir
+						}
+					}
+					if len(sourcePath) > 0 {
+						if err := cloneData(sourcePath, filepath.Join(hpc.cfg.StoragePoolDataDir[storagePoolName], req.GetName())); err != nil {
+							return nil, err
+						}
+					}
+				}
+		}
+	}
 
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
@@ -398,6 +459,7 @@ func (hpc *hostPathController) getControllerServiceCapabilities() []*csi.Control
 		csi.ControllerServiceCapability_RPC_GET_CAPACITY,
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
 		csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
+		csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
 	}
 
 	var csc []*csi.ControllerServiceCapability

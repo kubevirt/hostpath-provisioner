@@ -86,7 +86,10 @@ func Test_validateCreateVolumeRequest(t *testing.T) {
 
 func Test_validateCreateVolumeRequestTopology(t *testing.T) {
 	RegisterTestingT(t)
-	controller := createControllerServer("")
+	tempDir, err := ioutil.TempDir(os.TempDir(), "")
+	Expect(err).ToNot(HaveOccurred())
+	defer os.RemoveAll(tempDir)
+	controller := createControllerServer(tempDir)
 	t.Run("No AccessibilityRequirements", func(t *testing.T){
 		err := controller.validateCreateVolumeRequestTopology(&csi.CreateVolumeRequest{})
 		Expect(err).ToNot(HaveOccurred())
@@ -152,7 +155,40 @@ func Test_validateCreateVolumeRequestTopology(t *testing.T) {
 			},
 		})
 		Expect(err).To(BeEquivalentTo(status.Error(codes.InvalidArgument, "not correct node")))
-	})	
+	})
+	t.Run("Missing content volume source", func(t *testing.T) {
+		err := controller.validateCreateVolumeRequestTopology(&csi.CreateVolumeRequest{
+			AccessibilityRequirements: &csi.TopologyRequirement{
+				Preferred: []*csi.Topology{
+					{
+						Segments: map[string]string {
+							TopologyKeyNode: "test_node",
+						},
+					},
+				},
+			},
+			VolumeContentSource: &csi.VolumeContentSource{
+				Type: &csi.VolumeContentSource_Volume{
+					Volume: &csi.VolumeContentSource_VolumeSource{
+						VolumeId: "invalid_volume_id",
+					},
+				},
+			},
+		})
+		Expect(err).To(BeEquivalentTo(status.Error(codes.NotFound, "source not on node")))
+	})
+	t.Run("Missing content volume source, but no topology defined", func(t *testing.T) {
+		err := controller.validateCreateVolumeRequestTopology(&csi.CreateVolumeRequest{
+			VolumeContentSource: &csi.VolumeContentSource{
+				Type: &csi.VolumeContentSource_Volume{
+					Volume: &csi.VolumeContentSource_VolumeSource{
+						VolumeId: "invalid_volume_id",
+					},
+				},
+			},
+		})
+		Expect(err).To(BeEquivalentTo(status.Error(codes.NotFound, "source not on node")))
+	})
 }
 
 func Test_CreateVolumeInvalidRequest(t *testing.T) {
@@ -309,7 +345,7 @@ func Test_ControllerGetCapabilities(t *testing.T) {
 	resp, err := controller.ControllerGetCapabilities(context.TODO(), &csi.ControllerGetCapabilitiesRequest{})
 	Expect(err).ToNot(HaveOccurred())
 	caps := resp.Capabilities
-	Expect(len(caps)).To(Equal(5))
+	Expect(len(caps)).To(Equal(6))
 	Expect(caps).To(ContainElement(&csi.ControllerServiceCapability{
 		Type: &csi.ControllerServiceCapability_Rpc{
 			Rpc: &csi.ControllerServiceCapability_RPC{
@@ -342,6 +378,13 @@ func Test_ControllerGetCapabilities(t *testing.T) {
 		Type: &csi.ControllerServiceCapability_Rpc{
 			Rpc: &csi.ControllerServiceCapability_RPC{
 				Type: csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
+			},
+		},
+	}))
+	Expect(caps).To(ContainElement(&csi.ControllerServiceCapability{
+		Type: &csi.ControllerServiceCapability_Rpc{
+			Rpc: &csi.ControllerServiceCapability_RPC{
+				Type: csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
 			},
 		},
 	}))

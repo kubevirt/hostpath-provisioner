@@ -227,3 +227,12 @@ func evaluateSharedPathMetric(storagePoolDataDir map[string]string) {
 		poolPathSharedWithOsGauge.Set(0)
 	}
 }
+
+func cloneData(sourcePath, targetPath string) error {
+	out, err := exec.Command("/usr/bin/cp", "-av", "--reflink=auto", sourcePath + "/.", targetPath).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("error copying data, %s, %v", string(out), err)
+	}
+
+	return nil
+}
