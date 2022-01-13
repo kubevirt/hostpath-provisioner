@@ -40,6 +40,9 @@ func main() {
 	flag.StringVar(&cfg.Version, "version", "", "version of the plugin")
 	flag.Parse()
 
+	klog.V(1).Info("Starting Prometheus metrics endpoint server")
+	hostpath.RunPrometheusServer(":8080")
+
 	klog.V(1).Infof("Starting new HostPathDriver, config: %v", *cfg)
 	driver, err := hostpath.NewHostPathDriver(cfg, dataDir)
 	if err != nil {

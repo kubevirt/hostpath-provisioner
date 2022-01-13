@@ -17,17 +17,28 @@ package hostpath
 
 import (
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/klog/v2"
 )
 
 const (
 	// The storagePool field name in the storage class arguments.
-	storagePoolName = "storagePool"
+	storagePoolName       = "storagePool"
 	legacyStoragePoolName = "legacy"
+)
+
+var (
+	poolPathSharedWithOsGauge = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "kubevirt_hpp_pool_path_shared_with_os",
+			Help: "HPP pool path sharing a filesystem with OS, fix to prevent HPP PVs from causing disk pressure and affecting node operation",
+		})
 )
 
 // StoragePoolInfo contains the name and path of a storage pool.
@@ -124,4 +135,24 @@ func getVolumeDirectories(storagePoolDataDirs map[string]string) ([]string, erro
 	}
 	sort.Strings(directories)
 	return directories, nil
+}
+
+// RunPrometheusServer runs a prometheus server for metrics
+func RunPrometheusServer(metricsAddr string) {
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(poolPathSharedWithOsGauge)
+	handler := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", handler)
+	server := http.Server{
+		Addr:    metricsAddr,
+		Handler: mux,
+	}
+
+	go func() {
+		err := server.ListenAndServe()
+		if err != nil {
+			klog.Error(err, "Failed to start Prometheus metrics endpoint server")
+		}
+	}()
 }
