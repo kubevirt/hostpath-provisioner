@@ -156,10 +156,31 @@ func Test_validateCreateVolumeRequestTopology(t *testing.T) {
 		})
 		Expect(err).To(BeEquivalentTo(status.Error(codes.InvalidArgument, "not correct node")))
 	})
-	t.Run("Missing content volume source", func(t *testing.T) {
+	t.Run("Missing content volume source preferred", func(t *testing.T) {
 		err := controller.validateCreateVolumeRequestTopology(&csi.CreateVolumeRequest{
 			AccessibilityRequirements: &csi.TopologyRequirement{
 				Preferred: []*csi.Topology{
+					{
+						Segments: map[string]string {
+							TopologyKeyNode: "test_node",
+						},
+					},
+				},
+			},
+			VolumeContentSource: &csi.VolumeContentSource{
+				Type: &csi.VolumeContentSource_Volume{
+					Volume: &csi.VolumeContentSource_VolumeSource{
+						VolumeId: "invalid_volume_id",
+					},
+				},
+			},
+		})
+		Expect(err).To(BeEquivalentTo(status.Error(codes.NotFound, "source not on node")))
+	})
+	t.Run("Missing content volume source required", func(t *testing.T) {
+		err := controller.validateCreateVolumeRequestTopology(&csi.CreateVolumeRequest{
+			AccessibilityRequirements: &csi.TopologyRequirement{
+				Requisite: []*csi.Topology{
 					{
 						Segments: map[string]string {
 							TopologyKeyNode: "test_node",
@@ -188,6 +209,16 @@ func Test_validateCreateVolumeRequestTopology(t *testing.T) {
 			},
 		})
 		Expect(err).To(BeEquivalentTo(status.Error(codes.NotFound, "source not on node")))
+	})
+	t.Run("Unsupported content source type", func(t *testing.T) {
+		err := controller.validateCreateVolumeRequestTopology(&csi.CreateVolumeRequest{
+			VolumeContentSource: &csi.VolumeContentSource{
+				Type: &csi.VolumeContentSource_Snapshot{
+					Snapshot: &csi.VolumeContentSource_SnapshotSource{},
+				},
+			},
+		})
+		Expect(err).To(BeEquivalentTo(status.Error(codes.NotFound, "source specified, but unsupported source")))
 	})
 }
 
@@ -274,6 +305,52 @@ func Test_CreateVolumePVStatsErr(t *testing.T) {
 	_, err := controller.CreateVolume(context.TODO(), createTestRequest())
 	Expect(err).To(HaveOccurred())
 	Expect(err.Error()).To(ContainSubstring("getPVStatsEror"))
+}
+
+func Test_CreateVolumeClone(t *testing.T) {
+	RegisterTestingT(t)
+	tempDir, err := ioutil.TempDir(os.TempDir(), "")
+	Expect(err).ToNot(HaveOccurred())
+	defer os.RemoveAll(tempDir)
+	controller := createControllerServer(tempDir)
+
+	_, err = controller.CreateVolume(context.TODO(), createTestRequest())
+	Expect(err).ToNot(HaveOccurred())
+	fileInfo, err := os.Stat(filepath.Join(tempDir, "testname"))
+	Expect(err).ToNot(HaveOccurred())
+	Expect(fileInfo.IsDir()).To(BeTrue())
+	// Writing some test data
+	err = os.WriteFile(filepath.Join(tempDir, "testname", "test.txt"), []byte("Test data"), 0644)
+	Expect(err).ToNot(HaveOccurred())
+	// Create a clone request
+	cloneRequest := &csi.CreateVolumeRequest{
+		Name: "clonename",
+		VolumeCapabilities: []*csi.VolumeCapability{
+			{
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{},
+				},
+			},
+		},
+		VolumeContentSource: &csi.VolumeContentSource{
+			Type: &csi.VolumeContentSource_Volume{
+				Volume: &csi.VolumeContentSource_VolumeSource{
+					VolumeId: "testname",
+				},
+			},
+		},
+	}
+	_, err = controller.CreateVolume(context.TODO(), cloneRequest)
+	Expect(err).ToNot(HaveOccurred())
+	cloneDirInfo, err := os.Stat(filepath.Join(tempDir, "clonename"))
+	Expect(err).ToNot(HaveOccurred())
+	Expect(cloneDirInfo.IsDir()).To(BeTrue())
+	cloneFileInfo, err := os.Stat(filepath.Join(tempDir, "clonename", "test.txt"))
+	Expect(err).ToNot(HaveOccurred())
+	Expect(cloneFileInfo.IsDir()).To(BeFalse())
+	res, err := os.ReadFile(filepath.Join(tempDir, "clonename", "test.txt"))
+	Expect(err).ToNot(HaveOccurred())
+	Expect(string(res)).To(Equal("Test data"))
 }
 
 func Test_validateDeleteVolumeRequest(t *testing.T) {

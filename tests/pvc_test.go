@@ -17,6 +17,7 @@ package tests
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -276,6 +277,79 @@ func TestFsGroup(t *testing.T) {
 		}
 		return out
 	}, 90*time.Second, 1*time.Second).Should(ContainSubstring("-rw-r--r--. 1 1000 2000"))
+}
+
+func TestCSIClone(t *testing.T) {
+	RegisterTestingT(t)
+	tearDown, ns, k8sClient := setupTestCaseNs(t)
+	defer tearDown(t)
+	annotations := make(map[string]string)
+
+	sourcePvc := createPVCDef(ns.Name, csiStorageClassName, annotations)
+	defer func() {
+		// Cleanup
+		if sourcePvc != nil {
+			t.Logf("Removing PVC: %s", sourcePvc.Name)
+			err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), sourcePvc.Name, metav1.DeleteOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		}
+	}()
+	t.Logf("Creating source PVC: %s", sourcePvc.Name)
+	sourcePvc, err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(context.TODO(), sourcePvc, metav1.CreateOptions{})
+	Expect(err).ToNot(HaveOccurred())
+
+	pod := createPodUsingPVC(ns.Name, sourcePvc, annotations)
+	pod, err = k8sClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+	Expect(err).ToNot(HaveOccurred())
+	Eventually(func() bool {
+		pod, err = k8sClient.CoreV1().Pods(ns.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		return pod.Status.Phase == corev1.PodRunning || pod.Status.Phase == corev1.PodSucceeded
+	}, 90*time.Second, 1*time.Second).Should(BeTrue())
+	nodeRunningSourcePod := pod.Spec.NodeName
+	t.Logf("Source pod running on node %s", nodeRunningSourcePod)
+	err = k8sClient.CoreV1().Pods(ns.Name).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+	Expect(err).ToNot(HaveOccurred())
+
+	Eventually(func() v1.PersistentVolumeClaimPhase {
+		sourcePvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Get(context.TODO(), sourcePvc.Name, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		return sourcePvc.Status.Phase
+	}, 90*time.Second, 1*time.Second).Should(Equal(v1.ClaimBound))
+
+	podNames := make([]string, 0)
+	for i := 0; i < 10; i++ {
+		clonePvc := createPVCDef(ns.Name, csiStorageClassName, make(map[string]string))
+		defer func() {
+			// Cleanup
+			if clonePvc != nil {
+				t.Logf("Removing PVC: %s", clonePvc.Name)
+				err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), clonePvc.Name, metav1.DeleteOptions{})
+				Expect(err).ToNot(HaveOccurred())
+			}
+		}()
+		clonePvc.Spec.DataSource = &corev1.TypedLocalObjectReference{
+			Name: sourcePvc.GetName(),
+			Kind: "PersistentVolumeClaim",
+		}
+		clonePvc, err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(context.TODO(), clonePvc, metav1.CreateOptions{})
+		t.Logf("Created target PVC: %s", clonePvc.Name)
+		Expect(err).ToNot(HaveOccurred())
+		pod := createPodUsingPVCWithCommand(ns.Name, fmt.Sprintf("test-pod%d", i), clonePvc, "sleep 1", annotations)
+		pod, err = k8sClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		podNames = append(podNames, pod.GetName())
+	}
+	// Now all the pods have been created. They should eventually be running or completed
+	for _, podName := range podNames {
+		t.Logf("Checking if targetPod %s is running", podName)
+		Eventually(func() bool {
+			pod, err = k8sClient.CoreV1().Pods(ns.Name).Get(context.TODO(), podName, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			t.Logf("Checking if targetPod phase %s, nodename %v", pod.Status.Phase, pod.Spec.NodeName)
+			return (pod.Status.Phase == corev1.PodRunning || pod.Status.Phase == corev1.PodSucceeded) && pod.Spec.NodeName == nodeRunningSourcePod
+		}, 90*time.Second, 1*time.Second).Should(BeTrue())
+	}
 }
 
 func createPVCDef(namespace, storageClassName string, annotations map[string]string) *corev1.PersistentVolumeClaim {
