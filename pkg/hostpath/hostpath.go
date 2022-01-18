@@ -20,7 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	klog "k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 )
@@ -35,20 +37,20 @@ const (
 )
 
 type Config struct {
-	DriverName            string
-	Endpoint              string
-	NodeID                string
-	StoragePoolDataDir			map[string]string
+	DriverName             string
+	Endpoint               string
+	NodeID                 string
+	StoragePoolDataDir     map[string]string
 	DefaultStoragePoolName string
-	Version	       		  string
-	Mounter mount.Interface
+	Version                string
+	Mounter                mount.Interface
 }
 
 type hostPath struct {
-	cfg *Config
-	node *hostPathNode
+	cfg        *Config
+	node       *hostPathNode
 	controller *hostPathController
-	identity *hostPathIdentity
+	identity   *hostPathIdentity
 }
 
 func NewHostPathDriver(cfg *Config, dataDir string) (*hostPath, error) {
@@ -88,6 +90,24 @@ func NewHostPathDriver(cfg *Config, dataDir string) (*hostPath, error) {
 			return nil, fmt.Errorf("failed to create dataRoot for storage pool %s: %v", k, err)
 		}
 	}
+
+	// Run this a bunch of times over a period of 5 minutes so we catch the eventual state in metric
+	// and not some intermediate unmounted fluke
+	go wait.PollImmediate(1*time.Minute, 5*time.Minute, func() (bool, error) {
+		pathShared := false
+		for k, v := range cfg.StoragePoolDataDir {
+			if checkVolumePathSharedWithOS(v) {
+				pathShared = true
+				klog.V(1).Infof("pool (%s, %s), shares path with OS which can lead to node disk pressure", k, v)
+			}
+		}
+		if pathShared {
+			poolPathSharedWithOsGauge.Set(1)
+		} else {
+			poolPathSharedWithOsGauge.Set(0)
+		}
+		return false, nil
+	})
 
 	klog.V(1).Infof("Driver: %s, version: %s ", cfg.DriverName, cfg.Version)
 

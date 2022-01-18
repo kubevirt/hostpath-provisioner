@@ -16,11 +16,14 @@ limitations under the License.
 package hostpath
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -39,6 +42,7 @@ var (
 			Name: "kubevirt_hpp_pool_path_shared_with_os",
 			Help: "HPP pool path sharing a filesystem with OS, fix to prevent HPP PVs from causing disk pressure and affecting node operation",
 		})
+	csiSocketDir = "/csi"
 )
 
 // StoragePoolInfo contains the name and path of a storage pool.
@@ -155,4 +159,55 @@ func RunPrometheusServer(metricsAddr string) {
 			klog.Error(err, "Failed to start Prometheus metrics endpoint server")
 		}
 	}()
+}
+
+func getMountInfos(args ...string) ([]MountPointInfo, error) {
+	cmdPath, err := exec.LookPath("findmnt")
+	if err != nil {
+		return nil, fmt.Errorf("findmnt not found: %w", err)
+	}
+
+	args = append(args, "--json")
+	out, err := exec.Command(cmdPath, args...).CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(out) < 1 {
+		return nil, fmt.Errorf("mount point info is nil")
+	}
+
+	mountInfos, err := parseMountInfo([]byte(out))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse the mount infos: %+v", err)
+	}
+
+	return mountInfos, nil
+}
+
+func checkVolumePathSharedWithOS(volumePath string) bool {
+	mountInfosForPath, err := getMountInfos("-T", volumePath)
+	if err != nil {
+		return false
+	}
+
+	mountInfosForCsiSocketDir, err := getMountInfos("-T", csiSocketDir)
+	if err != nil {
+		return false
+	}
+
+	if len(mountInfosForPath) != 1 || len(mountInfosForCsiSocketDir) != 1 {
+		return false
+	}
+
+	pathSource := mountInfosForPath[0].Source
+	csiSocketSource := mountInfosForCsiSocketDir[0].Source
+	if strings.Contains(pathSource, "[") {
+		pathSource = strings.Split(pathSource, "[")[0]
+	}
+	if strings.Contains(csiSocketSource, "[") {
+		csiSocketSource = strings.Split(csiSocketSource, "[")[0]
+	}
+
+	return pathSource == csiSocketSource
 }
