@@ -22,7 +22,7 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/wait"
+	"golang.org/x/net/context"
 	klog "k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 )
@@ -53,7 +53,7 @@ type hostPath struct {
 	identity   *hostPathIdentity
 }
 
-func NewHostPathDriver(cfg *Config, dataDir string) (*hostPath, error) {
+func NewHostPathDriver(ctx context.Context, cfg *Config, dataDir string) (*hostPath, error) {
 	if cfg.DriverName == "" {
 		return nil, errors.New("no driver name provided")
 	}
@@ -91,23 +91,18 @@ func NewHostPathDriver(cfg *Config, dataDir string) (*hostPath, error) {
 		}
 	}
 
-	// Run this a bunch of times over a period of 5 minutes so we catch the eventual state in metric
-	// and not some intermediate unmounted fluke
-	go wait.PollImmediate(1*time.Minute, 5*time.Minute, func() (bool, error) {
-		pathShared := false
-		for k, v := range cfg.StoragePoolDataDir {
-			if checkVolumePathSharedWithOS(v) {
-				pathShared = true
-				klog.V(1).Infof("pool (%s, %s), shares path with OS which can lead to node disk pressure", k, v)
+	go func() {
+		evaluateSharedPathMetric(cfg.StoragePoolDataDir)
+		// Run this every minute so we catch the current state in metric (imagine people remounting on their own)
+		for {
+			select {
+			case <-time.After(1 * time.Minute):
+				evaluateSharedPathMetric(cfg.StoragePoolDataDir)
+			case <-ctx.Done():
+				return
 			}
 		}
-		if pathShared {
-			poolPathSharedWithOsGauge.Set(1)
-		} else {
-			poolPathSharedWithOsGauge.Set(0)
-		}
-		return false, nil
-	})
+	}()
 
 	klog.V(1).Infof("Driver: %s, version: %s ", cfg.DriverName, cfg.Version)
 
