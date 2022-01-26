@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	validVolId = "valid"
+	validVolId   = "valid"
 	invalidVolId = "invalid"
 )
 
@@ -36,37 +36,37 @@ func Test_roundDownCapacityPretty(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		args    args
-		want    int64
+		name string
+		args args
+		want int64
 	}{
 		{
 			name: "Rounds Gigs properly",
 			args: args{
 				size: int64(2 * gib),
 			},
-			want:    int64(2 * gib),
+			want: int64(2 * gib),
 		},
 		{
 			name: "Rounds Gigs properly with minor add",
 			args: args{
 				size: int64((2 * gib) + 2),
 			},
-			want:    int64(2 * gib),
+			want: int64(2 * gib),
 		},
 		{
 			name: "Not large enough for GiB, rounded down to smaller MiB",
 			args: args{
 				size: int64((2 * gib) - 2),
 			},
-			want:    int64(2047 * mib),
+			want: int64(2047 * mib),
 		},
 		{
 			name: "Large GiB, rounded down to one smaller GiB",
 			args: args{
 				size: int64((20 * gib) - 2),
 			},
-			want:    int64(19 * gib),
+			want: int64(19 * gib),
 		},
 	}
 	for _, tt := range tests {
@@ -85,22 +85,22 @@ func Test_UtilCreateVolume(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 	tests := []struct {
-		name string
-		base string
+		name  string
+		base  string
 		volId string
-		want bool
-	} {
+		want  bool
+	}{
 		{
-			name: "validVolId",
-			base: tempDir,
+			name:  "validVolId",
+			base:  tempDir,
 			volId: validVolId,
-			want: false,
+			want:  false,
 		},
 		{
-			name: "invalidVolId",
-			base: "/notvalid",
+			name:  "invalidVolId",
+			base:  "/notvalid",
 			volId: invalidVolId,
-			want: true,
+			want:  true,
 		},
 	}
 	for _, tt := range tests {
@@ -130,4 +130,38 @@ func Test_DeleteVolume(t *testing.T) {
 		err = DeleteVolume("/dev", "null")
 		Expect(err).To(HaveOccurred())
 	})
+}
+
+func Test_extractDeviceFromMountInfoSource(t *testing.T) {
+	RegisterTestingT(t)
+	type args struct {
+		source string
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "With square brackets should return just device",
+			args: args{
+				source: "/dev/vda4[/ostree/deploy/rhcos/var/lib/kubelet/plugins/csi-hostpath]",
+			},
+			want: "/dev/vda4",
+		},
+		{
+			name: "Without square brackets should return exactly that",
+			args: args{
+				source: "/dev/vda4",
+			},
+			want: "/dev/vda4",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractDeviceFromMountInfoSource(tt.args.source)
+			Expect(got).To(Equal(tt.want))
+		})
+	}
 }
