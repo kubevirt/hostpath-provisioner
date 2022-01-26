@@ -200,14 +200,15 @@ func checkVolumePathSharedWithOS(volumePath string) bool {
 		return false
 	}
 
-	pathSource := mountInfosForPath[0].Source
-	csiSocketSource := mountInfosForCsiSocketDir[0].Source
-	if strings.Contains(pathSource, "[") {
-		pathSource = strings.Split(pathSource, "[")[0]
-	}
-	if strings.Contains(csiSocketSource, "[") {
-		csiSocketSource = strings.Split(csiSocketSource, "[")[0]
-	}
+	pathSource := extractDeviceFromMountInfoSource(mountInfosForPath[0].Source)
+	csiSocketSource := extractDeviceFromMountInfoSource(mountInfosForCsiSocketDir[0].Source)
 
 	return pathSource == csiSocketSource
+}
+
+func extractDeviceFromMountInfoSource(source string) string {
+	if strings.Contains(source, "[") {
+		return strings.Split(source, "[")[0]
+	}
+	return source
 }
