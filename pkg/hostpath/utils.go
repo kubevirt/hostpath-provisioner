@@ -212,3 +212,18 @@ func extractDeviceFromMountInfoSource(source string) string {
 	}
 	return source
 }
+
+func evaluateSharedPathMetric(storagePoolDataDir map[string]string) {
+	pathShared := false
+	for k, v := range storagePoolDataDir {
+		if checkVolumePathSharedWithOS(v) {
+			pathShared = true
+			klog.V(1).Infof("pool (%s, %s), shares path with OS which can lead to node disk pressure", k, v)
+		}
+	}
+	if pathShared {
+		poolPathSharedWithOsGauge.Set(1)
+	} else {
+		poolPathSharedWithOsGauge.Set(0)
+	}
+}

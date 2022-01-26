@@ -20,6 +20,7 @@ import (
 	"os"
 
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 
 	"kubevirt.io/hostpath-provisioner/pkg/hostpath"
 )
@@ -44,7 +45,8 @@ func main() {
 	hostpath.RunPrometheusServer(":8080")
 
 	klog.V(1).Infof("Starting new HostPathDriver, config: %v", *cfg)
-	driver, err := hostpath.NewHostPathDriver(cfg, dataDir)
+	ctx := signals.SetupSignalHandler()
+	driver, err := hostpath.NewHostPathDriver(ctx, cfg, dataDir)
 	if err != nil {
 		klog.V(1).Infof("Failed to initialize driver: %s", err.Error())
 		os.Exit(1)

@@ -17,6 +17,7 @@ limitations under the License.
 package hostpath
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -48,7 +49,7 @@ func Test_NewHostPathDriver(t *testing.T) {
 
 	t.Run("blank config", func(t *testing.T) {
 		cfg := &Config{}
-		_, err = NewHostPathDriver(cfg, fmt.Sprintf(TestDatadirValue, tempDir))
+		_, err = NewHostPathDriver(context.TODO(), cfg, fmt.Sprintf(TestDatadirValue, tempDir))
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(BeEquivalentTo(errors.New("no driver name provided")))
 	})
@@ -57,7 +58,7 @@ func Test_NewHostPathDriver(t *testing.T) {
 		cfg := &Config{
 			DriverName: "test_driver",
 		}
-		_, err = NewHostPathDriver(cfg, fmt.Sprintf(TestDatadirValue, tempDir))
+		_, err = NewHostPathDriver(context.TODO(), cfg, fmt.Sprintf(TestDatadirValue, tempDir))
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(BeEquivalentTo(errors.New("no node id provided")))
 	})
@@ -67,7 +68,7 @@ func Test_NewHostPathDriver(t *testing.T) {
 			DriverName: "test_driver",
 			NodeID:     "test_nodeid",
 		}
-		_, err = NewHostPathDriver(cfg, fmt.Sprintf(TestDatadirValue, tempDir))
+		_, err = NewHostPathDriver(context.TODO(), cfg, fmt.Sprintf(TestDatadirValue, tempDir))
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(BeEquivalentTo(errors.New("no driver endpoint provided")))
 	})
@@ -78,7 +79,7 @@ func Test_NewHostPathDriver(t *testing.T) {
 			NodeID:     "test_nodeid",
 			Endpoint:   "unix://test.sock",
 		}
-		_, err = NewHostPathDriver(cfg, fmt.Sprintf(TestDatadirValue, tempDir))
+		_, err = NewHostPathDriver(context.TODO(), cfg, fmt.Sprintf(TestDatadirValue, tempDir))
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(BeEquivalentTo(errors.New("no version provided")))
 	})
@@ -91,7 +92,7 @@ func Test_NewHostPathDriver(t *testing.T) {
 			Version:    "test_version",
 			Mounter:    mount.NewFakeMounter([]mount.MountPoint{}), // If not set it will try to create a real mounter
 		}
-		drv, err := NewHostPathDriver(cfg, fmt.Sprintf(TestDatadirValue, filepath.Join(tempDir, "testdatadir")))
+		drv, err := NewHostPathDriver(context.TODO(), cfg, fmt.Sprintf(TestDatadirValue, filepath.Join(tempDir, "testdatadir")))
 		Expect(err).ToNot(HaveOccurred())
 		Expect(drv.node).ToNot(BeNil())
 		Expect(drv.controller).ToNot(BeNil())
@@ -108,7 +109,7 @@ func Test_NewHostPathDriver(t *testing.T) {
 			Version:    "test_version",
 			Mounter:    mount.NewFakeMounter([]mount.MountPoint{}), // If not set it will try to create a real mounter
 		}
-		drv, err := NewHostPathDriver(cfg, fmt.Sprintf(TestDatadirValue, filepath.Join(tempDir, "testdatadir")))
+		drv, err := NewHostPathDriver(context.TODO(), cfg, fmt.Sprintf(TestDatadirValue, filepath.Join(tempDir, "testdatadir")))
 		Expect(err).ToNot(HaveOccurred())
 		Expect(drv.node).ToNot(BeNil())
 		Expect(drv.controller).ToNot(BeNil())
@@ -122,7 +123,7 @@ func Test_NewHostPathDriver(t *testing.T) {
 
 		// Now switch the socket dir, so we are indeed sharing path with OS (we call NewHostPathDriver with tmpfs backed folder)
 		csiSocketDir = "/tmp"
-		drv, err = NewHostPathDriver(cfg, fmt.Sprintf(TestDatadirValue, filepath.Join(tempDir, "testdatadir")))
+		drv, err = NewHostPathDriver(context.TODO(), cfg, fmt.Sprintf(TestDatadirValue, filepath.Join(tempDir, "testdatadir")))
 		Expect(err).ToNot(HaveOccurred())
 		Expect(drv.node).ToNot(BeNil())
 		Expect(drv.controller).ToNot(BeNil())

@@ -16,6 +16,7 @@ limitations under the License.
 package sanity
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -29,7 +30,7 @@ import (
 )
 
 const (
-	sanityEndpoint = "sanity.sock"
+	sanityEndpoint   = "sanity.sock"
 	TestDatadirValue = "[{\"name\":\"legacy\",\"path\":\"%s\"}]"
 )
 
@@ -52,13 +53,13 @@ func TestMyDriver(t *testing.T) {
 	cfg.Version = "test-version"
 	cfg.NodeID = "testnode"
 
-	driver, err := hostpath.NewHostPathDriver(cfg, fmt.Sprintf(TestDatadirValue, volumeDir))
+	driver, err := hostpath.NewHostPathDriver(context.TODO(), cfg, fmt.Sprintf(TestDatadirValue, volumeDir))
 	Expect(err).ToNot(HaveOccurred())
 
-	go func() { 		
+	go func() {
 		err := driver.Run()
 		Expect(err).ToNot(HaveOccurred())
-	}() 
+	}()
 
 	testConfig := sanity.NewTestConfig()
 	// Set configuration options as needed
@@ -68,4 +69,3 @@ func TestMyDriver(t *testing.T) {
 	// Now call the test suite
 	sanity.Test(t, testConfig)
 }
-
