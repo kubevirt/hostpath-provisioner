@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	TopologyKeyNode = "topology.hostpath.csi/node"
+	TopologyKeyNode     = "topology.hostpath.csi/node"
 	ephemeralContextKey = "csi.storage.k8s.io/ephemeral"
 )
 
@@ -39,7 +39,7 @@ type hostPathNode struct {
 }
 
 func NewHostPathNode(config *Config) *hostPathNode {
-	return &hostPathNode {
+	return &hostPathNode{
 		cfg: config,
 	}
 }
@@ -86,14 +86,14 @@ func (hpn *hostPathNode) NodePublishVolume(ctx context.Context, req *csi.NodePub
 	}
 
 	targetPath := req.GetTargetPath()
-	
+
 	if canMnt, err := hpn.canMountVolume(targetPath); err != nil {
 		return nil, err
 	} else if !canMnt {
 		klog.V(3).Infof("Cannot mount to target path: %s", targetPath)
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
-	
+
 	if err := hpn.mountVolume(targetPath, req); err != nil {
 		return nil, err
 	}
@@ -266,7 +266,7 @@ func (hpn *hostPathNode) NodeUnstageVolume(ctx context.Context, req *csi.NodeUns
 
 func (hpn *hostPathNode) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	resp := &csi.NodeGetInfoResponse{
-		NodeId:            hpn.cfg.NodeID,
+		NodeId: hpn.cfg.NodeID,
 	}
 
 	resp.AccessibleTopology = &csi.Topology{
@@ -296,7 +296,6 @@ func (hpn *hostPathNode) NodeGetCapabilities(ctx context.Context, req *csi.NodeG
 
 	return &csi.NodeGetCapabilitiesResponse{Capabilities: caps}, nil
 }
-
 
 func (hpn *hostPathNode) validateNodeGetVolumeStatsRequest(req *csi.NodeGetVolumeStatsRequest) error {
 	if len(req.GetVolumeId()) == 0 {

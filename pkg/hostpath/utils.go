@@ -16,18 +16,33 @@ limitations under the License.
 package hostpath
 
 import (
+	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/klog/v2"
 )
 
 const (
 	// The storagePool field name in the storage class arguments.
-	storagePoolName = "storagePool"
+	storagePoolName       = "storagePool"
 	legacyStoragePoolName = "legacy"
+)
+
+var (
+	poolPathSharedWithOsGauge = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "kubevirt_hpp_pool_path_shared_with_os",
+			Help: "HPP pool path sharing a filesystem with OS, fix to prevent HPP PVs from causing disk pressure and affecting node operation",
+		})
+	csiSocketDir = "/csi"
 )
 
 // StoragePoolInfo contains the name and path of a storage pool.
@@ -124,4 +139,91 @@ func getVolumeDirectories(storagePoolDataDirs map[string]string) ([]string, erro
 	}
 	sort.Strings(directories)
 	return directories, nil
+}
+
+// RunPrometheusServer runs a prometheus server for metrics
+func RunPrometheusServer(metricsAddr string) {
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(poolPathSharedWithOsGauge)
+	handler := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", handler)
+	server := http.Server{
+		Addr:    metricsAddr,
+		Handler: mux,
+	}
+
+	go func() {
+		err := server.ListenAndServe()
+		if err != nil {
+			klog.Error(err, "Failed to start Prometheus metrics endpoint server")
+		}
+	}()
+}
+
+func getMountInfos(args ...string) ([]MountPointInfo, error) {
+	cmdPath, err := exec.LookPath("findmnt")
+	if err != nil {
+		return nil, fmt.Errorf("findmnt not found: %w", err)
+	}
+
+	args = append(args, "--json")
+	out, err := exec.Command(cmdPath, args...).CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(out) < 1 {
+		return nil, fmt.Errorf("mount point info is nil")
+	}
+
+	mountInfos, err := parseMountInfo([]byte(out))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse the mount infos: %+v", err)
+	}
+
+	return mountInfos, nil
+}
+
+func checkVolumePathSharedWithOS(volumePath string) bool {
+	mountInfosForPath, err := getMountInfos("-T", volumePath)
+	if err != nil {
+		return false
+	}
+
+	mountInfosForCsiSocketDir, err := getMountInfos("-T", csiSocketDir)
+	if err != nil {
+		return false
+	}
+
+	if len(mountInfosForPath) != 1 || len(mountInfosForCsiSocketDir) != 1 {
+		return false
+	}
+
+	pathSource := extractDeviceFromMountInfoSource(mountInfosForPath[0].Source)
+	csiSocketSource := extractDeviceFromMountInfoSource(mountInfosForCsiSocketDir[0].Source)
+
+	return pathSource == csiSocketSource
+}
+
+func extractDeviceFromMountInfoSource(source string) string {
+	if strings.Contains(source, "[") {
+		return strings.Split(source, "[")[0]
+	}
+	return source
+}
+
+func evaluateSharedPathMetric(storagePoolDataDir map[string]string) {
+	pathShared := false
+	for k, v := range storagePoolDataDir {
+		if checkVolumePathSharedWithOS(v) {
+			pathShared = true
+			klog.V(1).Infof("pool (%s, %s), shares path with OS which can lead to node disk pressure", k, v)
+		}
+	}
+	if pathShared {
+		poolPathSharedWithOsGauge.Set(1)
+	} else {
+		poolPathSharedWithOsGauge.Set(0)
+	}
 }

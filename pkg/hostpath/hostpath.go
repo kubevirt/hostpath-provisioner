@@ -20,7 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
+	"golang.org/x/net/context"
 	klog "k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 )
@@ -35,23 +37,23 @@ const (
 )
 
 type Config struct {
-	DriverName            string
-	Endpoint              string
-	NodeID                string
-	StoragePoolDataDir			map[string]string
+	DriverName             string
+	Endpoint               string
+	NodeID                 string
+	StoragePoolDataDir     map[string]string
 	DefaultStoragePoolName string
-	Version	       		  string
-	Mounter mount.Interface
+	Version                string
+	Mounter                mount.Interface
 }
 
 type hostPath struct {
-	cfg *Config
-	node *hostPathNode
+	cfg        *Config
+	node       *hostPathNode
 	controller *hostPathController
-	identity *hostPathIdentity
+	identity   *hostPathIdentity
 }
 
-func NewHostPathDriver(cfg *Config, dataDir string) (*hostPath, error) {
+func NewHostPathDriver(ctx context.Context, cfg *Config, dataDir string) (*hostPath, error) {
 	if cfg.DriverName == "" {
 		return nil, errors.New("no driver name provided")
 	}
@@ -88,6 +90,19 @@ func NewHostPathDriver(cfg *Config, dataDir string) (*hostPath, error) {
 			return nil, fmt.Errorf("failed to create dataRoot for storage pool %s: %v", k, err)
 		}
 	}
+
+	go func() {
+		evaluateSharedPathMetric(cfg.StoragePoolDataDir)
+		// Run this every minute so we catch the current state in metric (imagine people remounting on their own)
+		for {
+			select {
+			case <-time.After(1 * time.Minute):
+				evaluateSharedPathMetric(cfg.StoragePoolDataDir)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	klog.V(1).Infof("Driver: %s, version: %s ", cfg.DriverName, cfg.Version)
 

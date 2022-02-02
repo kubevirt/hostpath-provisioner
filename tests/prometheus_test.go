@@ -36,31 +36,33 @@ import (
 )
 
 const (
-	monitoringNs = "monitoring"
-	prometheusCRDName = "prometheuses.monitoring.coreos.com"
-	prometheusSaName = "prometheus-k8s"
+	monitoringNs             = "monitoring"
+	prometheusCRDName        = "prometheuses.monitoring.coreos.com"
+	prometheusSaName         = "prometheus-k8s"
 	prometheusSaSecretPrefix = "prometheus-k8s-token"
-	operatorUpQueryName = "kubevirt_hpp_operator_up_total"
-	hppCRReadyQueryName = "kubevirt_hpp_cr_ready"
-	promRuleOperatorUp = "1"
-	promRuleOperatorDown = "0"
-	promRuleCRReady = "1"
-	operatorDeploymentName = "hostpath-provisioner-operator"
+	operatorUpQueryName      = "kubevirt_hpp_operator_up_total"
+	hppCRReadyQueryName      = "kubevirt_hpp_cr_ready"
+	hppPoolSharedQueryName   = "kubevirt_hpp_pool_path_shared_with_os"
+	promRuleOperatorUp       = "1"
+	promRuleOperatorDown     = "0"
+	promRuleCRReady          = "1"
+	promRulePoolShared       = "1"
+	operatorDeploymentName   = "hostpath-provisioner-operator"
 )
 
 type promQueryResult struct {
-	Status string `json:"status"`
-	Data promData  `json:"data"`
+	Status string   `json:"status"`
+	Data   promData `json:"data"`
 }
 
 type promData struct {
-	ResultType string `json:"resultType"`
-	Result []promResult `json:"result"`
+	ResultType string       `json:"resultType"`
+	Result     []promResult `json:"result"`
 }
 
 type promResult struct {
-	Metric promMetric `json:"metric"`
-	Value []interface{} `json:"value"`
+	Metric promMetric    `json:"metric"`
+	Value  []interface{} `json:"value"`
 }
 
 type promMetric struct {
@@ -74,7 +76,7 @@ func TestPrometheusMetrics(t *testing.T) {
 	defer func() {
 		err := scaleOperatorUp(k8sClient)
 		Expect(err).ToNot(HaveOccurred(), "Unable to scale operator back up.")
-	} ()
+	}()
 	extClient, err := getExtClient()
 	Expect(err).ToNot(HaveOccurred())
 
@@ -87,8 +89,11 @@ func TestPrometheusMetrics(t *testing.T) {
 	t.Run("Operator Up", func(t *testing.T) {
 		testPrometheusRule(token, operatorUpQueryName, promRuleOperatorUp, t)
 	})
-	t.Run("HPP CR ready", func(t *testing.T){
+	t.Run("HPP CR ready", func(t *testing.T) {
 		testPrometheusRule(token, hppCRReadyQueryName, promRuleCRReady, t)
+	})
+	t.Run("HPP pool sharing path with OS", func(t *testing.T) {
+		testPrometheusRule(token, hppPoolSharedQueryName, promRulePoolShared, t)
 	})
 	err = scaleOperatorDown(k8sClient)
 	Expect(err).ToNot(HaveOccurred())
@@ -97,7 +102,7 @@ func TestPrometheusMetrics(t *testing.T) {
 	})
 }
 
-func testPrometheusRule (token, promQuery, value string, t *testing.T) {
+func testPrometheusRule(token, promQuery, value string, t *testing.T) {
 	prometheusURL := fmt.Sprintf("%s/api/v1/query?query=%s", getPrometheusBaseURL(), promQuery)
 	url, err := url.Parse(prometheusURL)
 	Expect(err).ToNot(HaveOccurred())
@@ -134,7 +139,7 @@ func getPrometheusBaseURL() string {
 	Expect(port).ToNot(BeEmpty())
 	port = strings.TrimSpace(port)
 	Expect(port).ToNot(BeEmpty())
-	baseUrl := fmt.Sprintf("http://localhost:%s", port)
+	baseUrl := fmt.Sprintf("http://127.0.0.1:%s", port)
 	return baseUrl
 }
 
