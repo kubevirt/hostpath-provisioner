@@ -50,7 +50,7 @@ then
   ssh_port=$(./cluster-up/cli.sh ports ssh)
   echo "ssh port: ${ssh_port}"
   #Start sshuttle
-  sshuttle -r vagrant@localhost:${ssh_port} 192.168.66.0/24 -e 'ssh -o StrictHostKeyChecking=no -i ./vagrant.key'&
+  sshuttle -r vagrant@127.0.0.1:${ssh_port} 192.168.66.0/24 -e 'ssh -o StrictHostKeyChecking=no -i ./vagrant.key'&
   SSHUTTLE_PID=$!
   function finish() {
     echo "TERMINATING SSHUTTLE!!!!"
