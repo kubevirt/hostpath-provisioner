@@ -19,22 +19,21 @@ package hostpath
 import (
 	"encoding/json"
 	"fmt"
-	"os/exec"
 
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
 type MountPointInfo struct {
-	Target              string           `json:"target"`
-	Source              string           `json:"source"`
-	FsType              string           `json:"fstype"`
-	Options             string           `json:"options"`
+	Target  string `json:"target"`
+	Source  string `json:"source"`
+	FsType  string `json:"fstype"`
+	Options string `json:"options"`
 }
 
 var (
 	checkMountPointExistsFunc = checkMountPointExist
-	getPVStatsFunc = getPVStats
+	getPVStatsFunc            = getPVStats
 )
 
 type FileSystems struct {
@@ -58,23 +57,9 @@ func parseMountInfo(originalMountInfo []byte) ([]MountPointInfo, error) {
 }
 
 func checkMountPointExist(volumePath string) (bool, error) {
-	cmdPath, err := exec.LookPath("findmnt")
-	if err != nil {
-		return false, fmt.Errorf("findmnt not found: %w", err)
-	}
-
-	out, err := exec.Command(cmdPath, volumePath, "--json").CombinedOutput()
+	mountInfos, err := getMountInfos(volumePath)
 	if err != nil {
 		return false, err
-	}
-
-	if len(out) < 1 {
-		return false, fmt.Errorf("mount point info is nil")
-	}
-
-	mountInfos, err := parseMountInfo([]byte(out))
-	if err != nil {
-		return false, fmt.Errorf("failed to parse the mount infos: %+v", err)
 	}
 
 	for _, mountInfo := range mountInfos {
@@ -96,7 +81,7 @@ func checkPVUsage(volumePath string) (int64, int64, error) {
 		return fsavailable, inodesFree, err
 	}
 
-	klog.V(3).Infof("fs available: %+v, total capacity: %d, percentage available: %.2f, number of free inodes: %d", fsavailable, capacity, float64(fsavailable) / float64(capacity) * 100, inodesFree)
+	klog.V(3).Infof("fs available: %+v, total capacity: %d, percentage available: %.2f, number of free inodes: %d", fsavailable, capacity, float64(fsavailable)/float64(capacity)*100, inodesFree)
 	return fsavailable, inodesFree, nil
 }
 
