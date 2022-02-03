@@ -34,16 +34,16 @@ import (
 )
 
 const (
-	csiSa = "hostpath-provisioner-admin-csi"
-	legacySa = "hostpath-provisioner-admin"
-	csiClusterRole = "hostpath-provisioner-admin-csi"
-	legacyClusterRole = "hostpath-provisioner"
-	csiClusterRoleBinding = "hostpath-provisioner-admin-csi"
+	csiSa                    = "hostpath-provisioner-admin-csi"
+	legacySa                 = "hostpath-provisioner-admin"
+	csiClusterRole           = "hostpath-provisioner-admin-csi"
+	legacyClusterRole        = "hostpath-provisioner"
+	csiClusterRoleBinding    = "hostpath-provisioner-admin-csi"
 	legacyClusterRoleBinding = "hostpath-provisioner"
-	csiRoleBinding = "hostpath-provisioner-admin-csi"
-	csiRole = "hostpath-provisioner-admin-csi"
+	csiRoleBinding           = "hostpath-provisioner-admin-csi"
+	csiRole                  = "hostpath-provisioner-admin-csi"
 
-	dsName = "hostpath-provisioner"
+	dsName    = "hostpath-provisioner"
 	dsCsiName = "hostpath-provisioner-csi"
 
 	namespace = "hostpath-provisioner"
@@ -65,81 +65,64 @@ func TestReconcileChangeOnDaemonSet(t *testing.T) {
 	tearDown, k8sClient := setupTestCase(t)
 	defer tearDown(t)
 
-	t.Run("Modify daemonset should be reverted", func(t *testing.T) {
-		ds, err := k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsName, metav1.GetOptions{})
-		Expect(err).ToNot(HaveOccurred())
-		originalEnvVarLen := len(ds.Spec.Template.Spec.Containers[0].Env)
-
-		ds.Spec.Template.Spec.Containers[0].Env = append(ds.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
-			Name: "something",
-			Value: "true",
-		})
-		_, err = k8sClient.AppsV1().DaemonSets(namespace).Update(context.TODO(), ds, metav1.UpdateOptions{})
-		Expect(err).ToNot(HaveOccurred())
-
-		Eventually(func() int {
-			// Assure original value is restored
-			ds, err = k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsName, metav1.GetOptions{})
-			Expect(err).ToNot(HaveOccurred())
-			return len(ds.Spec.Template.Spec.Containers[0].Env)
-		}, 2*time.Minute, 1*time.Second).Should(Equal(originalEnvVarLen))
+	t.Run("legacy provisioner ds modify", func(t *testing.T) {
+		if isLegacyHPPAvailable() {
+			runChangeOnDsTest(dsName, k8sClient)
+		}
 	})
-
-	t.Run("Modify daemonset should be reverted CSI", func(t *testing.T) {
-		ds, err := k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsCsiName, metav1.GetOptions{})
-		Expect(err).ToNot(HaveOccurred())
-		originalEnvVarLen := len(ds.Spec.Template.Spec.Containers[0].Env)
-
-		ds.Spec.Template.Spec.Containers[0].Env = append(ds.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
-			Name: "something",
-			Value: "true",
-		})
-		_, err = k8sClient.AppsV1().DaemonSets(namespace).Update(context.TODO(), ds, metav1.UpdateOptions{})
-		Expect(err).ToNot(HaveOccurred())
-
-		Eventually(func() int {
-			// Assure original value is restored
-			ds, err = k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsCsiName, metav1.GetOptions{})
-			Expect(err).ToNot(HaveOccurred())
-			return len(ds.Spec.Template.Spec.Containers[0].Env)
-		}, 2*time.Minute, 1*time.Second).Should(Equal(originalEnvVarLen))
+	t.Run("legacy provisioner ds delete", func(t *testing.T) {
+		if isLegacyHPPAvailable() {
+			runDeleteDsTest(dsName, k8sClient)
+		}
 	})
-
-	t.Run("Delete daemonset should be restored", func(t *testing.T) {
-		ds, err := k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsName, metav1.GetOptions{})
-		Expect(err).ToNot(HaveOccurred())
-
-		err = k8sClient.AppsV1().DaemonSets(namespace).Delete(context.TODO(), ds.Name, metav1.DeleteOptions{})
-		Expect(err).ToNot(HaveOccurred())
-
-		Eventually(func() bool {
-			// Assure original value is restored
-			ds, err = k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsName, metav1.GetOptions{})
-			if errors.IsNotFound(err) {
-				return false
-			}
-			Expect(err).ToNot(HaveOccurred())
-			return ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
-		}, 2*time.Minute, 1*time.Second).Should(BeTrue())
+	t.Run("csi driver ds modify", func(t *testing.T) {
+		if isCSIStorageClass(k8sClient) {
+			runChangeOnDsTest(dsCsiName, k8sClient)
+		}
 	})
-
-	t.Run("Delete daemonset should be restored CSI", func(t *testing.T) {
-		ds, err := k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsCsiName, metav1.GetOptions{})
-		Expect(err).ToNot(HaveOccurred())
-
-		err = k8sClient.AppsV1().DaemonSets(namespace).Delete(context.TODO(), ds.Name, metav1.DeleteOptions{})
-		Expect(err).ToNot(HaveOccurred())
-
-		Eventually(func() bool {
-			// Assure original value is restored
-			ds, err = k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsCsiName, metav1.GetOptions{})
-			if errors.IsNotFound(err) {
-				return false
-			}
-			Expect(err).ToNot(HaveOccurred())
-			return ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
-		}, 2*time.Minute, 1*time.Second).Should(BeTrue())
+	t.Run("csi driver ds delete", func(t *testing.T) {
+		if isCSIStorageClass(k8sClient) {
+			runDeleteDsTest(dsCsiName, k8sClient)
+		}
 	})
+}
+
+func runChangeOnDsTest(dsName string, k8sClient *kubernetes.Clientset) {
+	ds, err := k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsName, metav1.GetOptions{})
+	Expect(err).ToNot(HaveOccurred())
+	originalEnvVarLen := len(ds.Spec.Template.Spec.Containers[0].Env)
+
+	ds.Spec.Template.Spec.Containers[0].Env = append(ds.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
+		Name:  "something",
+		Value: "true",
+	})
+	_, err = k8sClient.AppsV1().DaemonSets(namespace).Update(context.TODO(), ds, metav1.UpdateOptions{})
+	Expect(err).ToNot(HaveOccurred())
+
+	Eventually(func() int {
+		// Assure original value is restored
+		ds, err = k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsName, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		return len(ds.Spec.Template.Spec.Containers[0].Env)
+	}, 2*time.Minute, 1*time.Second).Should(Equal(originalEnvVarLen))
+}
+
+func runDeleteDsTest(dsName string, k8sClient *kubernetes.Clientset) {
+	ds, err := k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsName, metav1.GetOptions{})
+	Expect(err).ToNot(HaveOccurred())
+
+	err = k8sClient.AppsV1().DaemonSets(namespace).Delete(context.TODO(), ds.Name, metav1.DeleteOptions{})
+	Expect(err).ToNot(HaveOccurred())
+
+	Eventually(func() bool {
+		// Assure original value is restored
+		ds, err = k8sClient.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return false
+		}
+		Expect(err).ToNot(HaveOccurred())
+		return ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
+	}, 2*time.Minute, 1*time.Second).Should(BeTrue())
 }
 
 func runChangeOnSaTest(saName string, k8sClient *kubernetes.Clientset) {
@@ -178,10 +161,14 @@ func TestReconcileChangeOnServiceAccount(t *testing.T) {
 	defer tearDown(t)
 
 	t.Run("legacy provisioner sa modify", func(t *testing.T) {
-		runChangeOnSaTest(legacySa, k8sClient)
+		if isLegacyHPPAvailable() {
+			runChangeOnSaTest(legacySa, k8sClient)
+		}
 	})
 	t.Run("legacy provisioner sa delete", func(t *testing.T) {
-		runDeleteSaTest(legacySa, k8sClient)
+		if isLegacyHPPAvailable() {
+			runDeleteSaTest(legacySa, k8sClient)
+		}
 	})
 	t.Run("csi driver sa modify", func(t *testing.T) {
 		if isCSIStorageClass(k8sClient) {
@@ -232,7 +219,9 @@ func TestReconcileChangeOnClusterRole(t *testing.T) {
 	defer tearDown(t)
 
 	t.Run("legacy provisioner", func(t *testing.T) {
-		runClusterRoleTest(legacyClusterRole, k8sClient)
+		if isLegacyHPPAvailable() {
+			runClusterRoleTest(legacyClusterRole, k8sClient)
+		}
 	})
 	t.Run("csi driver", func(t *testing.T) {
 		if isCSIStorageClass(k8sClient) {
@@ -241,7 +230,7 @@ func TestReconcileChangeOnClusterRole(t *testing.T) {
 	})
 }
 
-func runClusterRoleBindingTest(clusterRoleName string,  k8sClient *kubernetes.Clientset) {
+func runClusterRoleBindingTest(clusterRoleName string, k8sClient *kubernetes.Clientset) {
 	crb, err := k8sClient.RbacV1().ClusterRoleBindings().Get(context.TODO(), clusterRoleName, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
@@ -271,7 +260,9 @@ func TestReconcileChangeOnClusterRoleBinding(t *testing.T) {
 	defer tearDown(t)
 
 	t.Run("legacy provisioner", func(t *testing.T) {
-		runClusterRoleBindingTest(legacyClusterRoleBinding, k8sClient)
+		if isLegacyHPPAvailable() {
+			runClusterRoleBindingTest(legacyClusterRoleBinding, k8sClient)
+		}
 	})
 	t.Run("csi driver", func(t *testing.T) {
 		if isCSIStorageClass(k8sClient) {
@@ -393,7 +384,7 @@ func TestNodeSelector(t *testing.T) {
 		Expect(err).ToNot(HaveOccurred())
 
 		Eventually(func() bool {
-			ds, err := k8sClient.AppsV1().DaemonSets("hostpath-provisioner").Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
+			ds, err := k8sClient.AppsV1().DaemonSets("hostpath-provisioner").Get(context.TODO(), dsCsiName, metav1.GetOptions{})
 			if err != nil {
 				return false
 			}
@@ -418,7 +409,7 @@ func TestNodeSelector(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	Eventually(func() bool {
-		ds, err := k8sClient.AppsV1().DaemonSets("hostpath-provisioner").Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
+		ds, err := k8sClient.AppsV1().DaemonSets("hostpath-provisioner").Get(context.TODO(), dsCsiName, metav1.GetOptions{})
 		if err != nil {
 			return false
 		}
@@ -484,4 +475,3 @@ func Test_CSIDriver(t *testing.T) {
 		verifyCsiDriver(k8sClient)
 	})
 }
-

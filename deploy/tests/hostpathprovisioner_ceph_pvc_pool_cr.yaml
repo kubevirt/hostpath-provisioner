@@ -1,0 +1,20 @@
+apiVersion: hostpathprovisioner.kubevirt.io/v1beta1
+kind: HostPathProvisioner
+metadata:
+  name: hostpath-provisioner
+spec:
+  imagePullPolicy: Always
+  storagePools:
+      - name: ceph
+        pvcTemplate:
+          volumeMode: Block
+          storageClassName: rook-ceph-block
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: 5Gi
+        path: "/var/hpvolumes"
+  workload:
+    nodeSelector:
+      kubernetes.io/os: linux
