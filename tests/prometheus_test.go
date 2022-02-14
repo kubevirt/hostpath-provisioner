@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -46,7 +47,6 @@ const (
 	promRuleOperatorUp       = "1"
 	promRuleOperatorDown     = "0"
 	promRuleCRReady          = "1"
-	promRulePoolShared       = "1"
 	operatorDeploymentName   = "hostpath-provisioner-operator"
 )
 
@@ -93,6 +93,15 @@ func TestPrometheusMetrics(t *testing.T) {
 		testPrometheusRule(token, hppCRReadyQueryName, promRuleCRReady, t)
 	})
 	t.Run("HPP pool sharing path with OS", func(t *testing.T) {
+		promRulePoolShared := "0"
+		backingStorage := os.Getenv("KUBEVIRT_STORAGE")
+		hppCrType := os.Getenv("HPP_CR_TYPE")
+		// Our only CI setup that avoids sharing path with OS
+		// is a backing rook-ceph-block PVC of the HPP storage pool
+		shared := backingStorage != "rook-ceph-default" || hppCrType != "storagepool-pvc-template"
+		if shared {
+			promRulePoolShared = "1"
+		}
 		testPrometheusRule(token, hppPoolSharedQueryName, promRulePoolShared, t)
 	})
 	err = scaleOperatorDown(k8sClient)

@@ -85,9 +85,15 @@ _kubectl get pods -n hostpath-provisioner
 _kubectl patch deployment hostpath-provisioner-operator -n hostpath-provisioner --patch-file cluster-sync/patch.yaml
 
 _kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=120s
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/hostpathprovisioner_legacy_cr.yaml
+HPP_CR_PATH="https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/hostpathprovisioner_legacy_cr.yaml"
+HPP_CSI_SC="https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-legacy-csi.yaml"
+if [ "${KUBEVIRT_STORAGE}" == "rook-ceph-default" ] && [ "${HPP_CR_TYPE}" == "storagepool-pvc-template" ]; then
+  HPP_CR_PATH="deploy/tests/hostpathprovisioner_ceph_pvc_pool_cr.yaml"
+  HPP_CSI_SC="deploy/tests/storageclass_wffc_ceph_pool.yaml"
+fi
+_kubectl apply -f $HPP_CR_PATH
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-legacy.yaml
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-legacy-csi.yaml
+_kubectl apply -f $HPP_CSI_SC
 
 cat <<EOF | _kubectl apply -f -
 apiVersion: storage.k8s.io/v1

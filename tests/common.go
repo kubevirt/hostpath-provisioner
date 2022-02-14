@@ -45,7 +45,7 @@ const (
 	GiB int64 = 1024 * MiB
 	TiB int64 = 1024 * GiB
 
-	csiProvisionerName = "kubevirt.io.hostpath-provisioner"
+	csiProvisionerName    = "kubevirt.io.hostpath-provisioner"
 	legacyProvisionerName = "kubevirt.io/hostpath-provisioner"
 )
 
@@ -248,3 +248,11 @@ func isCSIStorageClass(k8sClient *kubernetes.Clientset) bool {
 	return sc.Provisioner == csiProvisionerName
 }
 
+func isLegacyHPPAvailable() bool {
+	hppClient, err := getHPPClient()
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	cr, err := hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	return cr.Spec.PathConfig != nil
+}
