@@ -28,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
+
 	. "github.com/onsi/gomega"
 
 	extclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -109,6 +111,9 @@ func TestPrometheusMetrics(t *testing.T) {
 	t.Run("Operator Down", func(t *testing.T) {
 		testPrometheusRule(token, operatorUpQueryName, promRuleOperatorDown, t)
 	})
+	t.Run("Available Runbook URLS", func(t *testing.T) {
+		testPrometheusRunbookURLs(k8sClient)
+	})
 }
 
 func testPrometheusRule(token, promQuery, value string, t *testing.T) {
@@ -126,6 +131,34 @@ func testPrometheusRule(token, promQuery, value string, t *testing.T) {
 			result.Data.Result[0].Value[1] == value &&
 			result.Data.Result[0].Metric.Name == url.Query().Get("query")
 	}, 2*time.Minute, 1*time.Second).Should(BeTrue())
+}
+
+func testPrometheusRunbookURLs(k8sClient *kubernetes.Clientset) {
+	var promRule monitoringv1.PrometheusRule
+	err := k8sClient.RESTClient().Get().
+		Resource("prometheusrules").
+		Name("prometheus-hpp-rules").
+		Namespace(namespace).
+		AbsPath("/apis", monitoringv1.SchemeGroupVersion.Group, monitoringv1.SchemeGroupVersion.Version).
+		Timeout(10 * time.Second).
+		Do(context.TODO()).Into(&promRule)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(promRule.Spec.Groups).ToNot(BeEmpty())
+	for _, group := range promRule.Spec.Groups {
+		if group.Name == "hpp.rules" {
+			Expect(group.Rules).ToNot(BeEmpty())
+			for _, rule := range group.Rules {
+				if len(rule.Alert) > 0 {
+					Expect(rule.Annotations).ToNot(BeNil())
+					url, ok := rule.Annotations["runbook_url"]
+					Expect(ok).To(BeTrue())
+					resp, err := http.Head(url)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(resp.StatusCode).Should(Equal(http.StatusOK))
+				}
+			}
+		}
+	}
 }
 
 // IsPrometheusAvailable decides whether or not we will run prometheus alert/metric tests

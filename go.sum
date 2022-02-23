@@ -266,6 +266,7 @@ github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea/go.mod h1:E3G3o1h8I7cfc
 github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f/go.mod h1:E3G3o1h8I7cfcXa63jLwjI0eiQQMgzzUDFVpN/nH/eA=
 github.com/coreos/prometheus-operator v0.31.1/go.mod h1:vHwtP2e+VmEeS6m6lgp87aH+npGVRQsCi5jhcuQA1sA=
 github.com/coreos/prometheus-operator v0.34.0/go.mod h1:Li6rMllG/hYIyXfMuvUwhyC+hqwJVHdsDdP21hypT1M=
+github.com/coreos/prometheus-operator v0.38.1-0.20200424145508-7e176fda06cc h1:nMbUjGuF7UzVluucix/vsy4973BNdEiT/aX6kFtskKM=
 github.com/coreos/prometheus-operator v0.38.1-0.20200424145508-7e176fda06cc/go.mod h1:erio69w1R/aC14D5nfvAXSlE8FT8jt2Hnavc50Dp33A=
 github.com/coreos/rkt v1.30.0/go.mod h1:O634mlH6U7qk87poQifK6M2rsFNt+FyUTWNMnP1hF1U=
 github.com/cpuguy83/go-md2man v1.0.10/go.mod h1:SmD6nW6nTyfqj6ABTjUi3V3JVMnlJmwcJI5acqYI6dE=

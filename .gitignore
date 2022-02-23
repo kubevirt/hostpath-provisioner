@@ -8,3 +8,4 @@ _ci-configs/*
 vagrant.key
 e2e.test
 ginkgo
+.idea
