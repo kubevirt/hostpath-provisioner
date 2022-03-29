@@ -11,7 +11,7 @@ require (
 	github.com/kubernetes-csi/csi-test/v4 v4.2.0
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.15.0
-	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/client_golang v1.11.1
 	github.com/prometheus/client_model v0.2.0
 	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
 	golang.org/x/sys v0.0.0-20211004093028-2c5d950f24ef
