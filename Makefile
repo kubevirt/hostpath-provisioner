@@ -20,7 +20,7 @@ HPP_CSI_IMAGE?=hostpath-csi-driver
 TAG?=latest
 DOCKER_REPO?=kubevirt
 ARTIFACTS_PATH?=_out
-GOLANG_VER?=1.16.8
+GOLANG_VER?=1.18
 
 all: controller hostpath-provisioner
 
