@@ -17,7 +17,7 @@ source ./cluster-up/hack/common.sh
 source ./cluster-up/cluster/${KUBEVIRT_PROVIDER}/provider.sh
 
 export KUBEVIRT_NUM_NODES=2
-export KUBEVIRT_PROVIDER=k8s-1.22
+export KUBEVIRT_PROVIDER=k8s-1.23
 make cluster-down
 make cluster-up
 

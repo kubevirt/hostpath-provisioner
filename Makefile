@@ -14,13 +14,13 @@
 
 .PHONY: cluster-up cluster-down cluster-sync cluster-clean
 
-KUBEVIRT_PROVIDER?=k8s-1.22
+KUBEVIRT_PROVIDER?=k8s-1.23
 HPP_IMAGE?=hostpath-provisioner
 HPP_CSI_IMAGE?=hostpath-csi-driver
 TAG?=latest
 DOCKER_REPO?=kubevirt
 ARTIFACTS_PATH?=_out
-GOLANG_VER?=1.16.8
+GOLANG_VER?=1.18.2
 
 all: controller hostpath-provisioner
 
@@ -68,7 +68,6 @@ test:
 	hack/language.sh
 
 test-functional:
-	go mod vendor
 	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -kubeconfig="../_ci-configs/$(KUBEVIRT_PROVIDER)/.kubeconfig"
 
 test-sanity:
