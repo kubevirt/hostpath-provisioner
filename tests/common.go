@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -149,17 +148,10 @@ func RunNodeSSHCommand(args ...string) (string, error) {
 		return "", err
 	}
 
-	capture := false
 	returnBuf := bytes.NewBuffer(nil)
 	scanner := bufio.NewScanner(&outBuf)
 	for scanner.Scan() {
 		t := scanner.Text()
-		if !capture {
-			if strings.Contains(t, "Connected to tcp://192.168.66.") {
-				capture = true
-			}
-			continue
-		}
 		_, err = returnBuf.Write([]byte(t))
 		if err != nil {
 			return "", err

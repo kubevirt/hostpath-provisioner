@@ -164,17 +164,10 @@ func TestPVCSize(t *testing.T) {
 
 	annotations := make(map[string]string)
 	pvc := createPVCDef(ns.Name, legacyStorageClassName, annotations)
-	defer func() {
-		// Cleanup
-		if pvc != nil {
-			t.Logf("Removing PVC: %s", pvc.Name)
-			err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{})
-			Expect(err).ToNot(HaveOccurred())
-		}
-	}()
 
 	dfString, err := RunNodeSSHCommand("node01", "df -Bk /var/hpvolumes | sed 1d")
 	Expect(err).ToNot(HaveOccurred())
+	Expect(dfString).ToNot(BeEmpty())
 	sizeQuantity := resource.MustParse(strings.ToLower(strings.Fields(dfString)[1]))
 	int64Size, _ := sizeQuantity.AsInt64()
 	hostQuantity := resource.NewQuantity(int64(roundDownCapacityPretty(int64Size)), resource.BinarySI)
@@ -183,6 +176,14 @@ func TestPVCSize(t *testing.T) {
 	t.Logf("Creating PVC: %s", pvc.Name)
 	pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
 	Expect(err).ToNot(HaveOccurred())
+	defer func() {
+		// Cleanup
+		if pvc != nil {
+			t.Logf("Removing PVC: %s", pvc.Name)
+			err := k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		}
+	}()
 
 	Eventually(func() corev1.PersistentVolumeClaimPhase {
 		pvc, err = k8sClient.CoreV1().PersistentVolumeClaims(ns.Name).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
