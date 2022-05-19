@@ -22,13 +22,17 @@ DOCKER_REPO?=kubevirt
 ARTIFACTS_PATH?=_out
 GOLANG_VER?=1.18.2
 
+export GOLANG_VER
+export KUBEVIRT_PROVIDER
+export DOCKER_REPO
+
 all: controller hostpath-provisioner
 
 hostpath-provisioner:
-	GOLANG_VER=${GOLANG_VER} ./hack/build-provisioner.sh
+	./hack/build-provisioner.sh
 
 hostpath-csi-driver:
-	GOLANG_VER=${GOLANG_VER} ./hack/build-csi.sh
+	./hack/build-csi.sh
 
 image: image-controller image-csi
 
@@ -52,23 +56,23 @@ clean:
 build: clean hostpath-provisioner hostpath-csi-driver
 
 cluster-up:
-	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} ./cluster-up/up.sh
+	./cluster-up/up.sh
 
 cluster-down: 
-	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} ./cluster-up/down.sh
+	./cluster-up/down.sh
 
 cluster-sync: cluster-clean
-	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} ./cluster-sync/sync.sh
+	./cluster-sync/sync.sh
 
 cluster-clean:
-	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} ./cluster-sync/clean.sh
+	./cluster-sync/clean.sh
 
 test:
-	GOLANG_VER=${GOLANG_VER} ./hack/run-unit-test.sh
+	./hack/run-unit-test.sh
 	hack/language.sh
 
 test-functional:
-	KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER} gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -kubeconfig="../_ci-configs/$(KUBEVIRT_PROVIDER)/.kubeconfig"
+	gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -kubeconfig="../_ci-configs/$(KUBEVIRT_PROVIDER)/.kubeconfig"
 
 test-sanity:
-	GOLANG_VER=${GOLANG_VER} DOCKER_REPO=${DOCKER_REPO} hack/sanity.sh
+	hack/sanity.sh
