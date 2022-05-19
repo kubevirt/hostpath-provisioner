@@ -12,7 +12,7 @@
 #See the License for the specific language governing permissions and
 #limitations under the License.
 
-GOLANG_VER=${GOLANG_VER:-1.16.8}
+GOLANG_VER=${GOLANG_VER:-1.18.2}
 
 function setGoInProw() {
   if [[ -v PROW_JOB_ID ]] ; then
