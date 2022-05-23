@@ -4,14 +4,9 @@ Let's start with the relationship between several related projects:
 
 * **Kubernetes** is a container orchestration system, and is used to run
   containers on a cluster
-* **containerized-data-importer (CDI)** is an add-on which solves the problem of
-  populating Kubernetes Persistent Volumes with data.  It was written to be
-  general purpose but with the virtualization use case in mind.  Therefore, it
-  has a close relationship and special integration with KubeVirt.
-* **KubeVirt** is an add-on which is installed on-top of Kubernetes, to be able
-  to add basic virtualization functionality to Kubernetes.
+* **hostpath-provisioner (hpp)** is a storage provisioner provides filesystem based local storage to kubernetes. The hpp is a fully compatible CSI driver.
 
-As an add-on to Kubernetes, CDI shares some philosophy and design choices:
+As an add-on to Kubernetes, hpp shares some philosophy and design choices:
 
 * Mostly written in golang
 * Often related to distributed microservice architectures
@@ -21,7 +16,7 @@ This short page shall help to get started with the projects and topics
 surrounding them.  If you notice a strong similarity with the [KubeVirt contribution guidelines](https://github.com/kubevirt/kubevirt/blob/main/CONTRIBUTING.md) it's because we have taken inspiration from their success.
 
 
-## Contributing to Hosthpath provisioner
+## Contributing to hostpath provisioner
 
 ### Our workflow
 
@@ -37,9 +32,6 @@ at [kubevirt/hostpath-provisioner](https://github.com/kubevirt/hostpath-provisio
 For bigger changes, please create a tracker Issue, describing what you want to
 do. Then either as the first commit in a Pull Request, or as an independent
 Pull Request, provide an **informal** design proposal of your intended changes.
-The location for such propoals is
-[/docs](docs/) in the hostpath provisioner repository. Make sure that all your Pull Requests link back to the
-relevant Issues.
 
 ### Getting started
 
@@ -55,8 +47,7 @@ Any help is greatly appreciated.
 **Untested features do not exist**. To ensure that what we code really works,
 relevant flows should be covered via unit tests and functional tests. So when
 thinking about a contribution, also think about testability. All tests can be
-run local without the need of CI. Have a look at the
-[Developer Guide](hack/README.md).
+run local without the need of CI.
 
 ### Getting your code reviewed/merged
 
@@ -64,22 +55,32 @@ Maintainers are here to help you enabling your use-case in a reasonable amount
 of time. The maintainers will try to review your code and give you productive
 feedback in a reasonable amount of time. However, if you are blocked on a
 review, or your Pull Request does not get the attention you think it deserves,
-reach out for us via Comments in your Issues, or ping us on slack in the virtualization room
-[#virtualization](https://kubernetes.slack.com/archives/C8ED7RKFE).
+reach out for us via Comments in your Issues, or ping us on
+[Slack](https://kubernetes.slack.com/messages/kubevirt-dev).
 
 Maintainers are:
 
 * @awels
-* @j-griffith
-* @aglitke
 
 ### PR Checklist
 
 Before your PR can be merged it must meet the following criteria:
 * [README.md](README.md) has been updated if core functionality is affected.
-* Complex features need standalone documentation in [doc/](doc/).
-* Functionality must be fully tested.
+* Complex features need standalone documentation in a tracker issue that can be closed by a PR.
+
 ## Projects & Communities
+
+### [CDI](https://github.com/kubevirt/containerized-data-importer)
+
+* Getting started
+  * [Developer Guide](https://github.com/kubevirt/containerized-data-importer/blob/main/hack/README.md)
+  * [Other Documentation](https://github.com/kubevirt/containerized-data-importer/tree/main/doc)
+
+### [KubeVirt](https://github.com/kubevirt/kubevirt)
+
+* Getting started
+  * [Developer Guide](hthttps://github.com/kubevirt/kubevirt/blob/main/docs/getting-started.md)
+  * [Documentation](https://github.com/kubevirt/user-guide)
 
 ### [Kubernetes](http://kubernetes.io/)
 
@@ -100,3 +101,5 @@ Before your PR can be merged it must meet the following criteria:
   * [Introducing Operators: Putting Operational Knowledge into Software](https://coreos.com/blog/introducing-operators.html)
   * [Microservices](https://martinfowler.com/articles/microservices.html) nice
     content by Martin Fowler
+* Testing
+  * [Ginkgo - A Golang BDD Testing Framework](https://onsi.github.io/ginkgo/)
