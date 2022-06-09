@@ -18,13 +18,18 @@ KUBEVIRT_PROVIDER?=k8s-1.23
 HPP_IMAGE?=hostpath-provisioner
 HPP_CSI_IMAGE?=hostpath-csi-driver
 TAG?=latest
-DOCKER_REPO?=kubevirt
+DOCKER_REPO?=quay.io/kubevirt
 ARTIFACTS_PATH?=_out
 GOLANG_VER?=1.18.2
+GOOS?=linux
+GOARCH?=amd64
+BUILDAH_PLATFORM_FLAG?=--platform $(GOOS)/$(GOARCH)
 
 export GOLANG_VER
 export KUBEVIRT_PROVIDER
 export DOCKER_REPO
+export GOOS
+export GOARCH
 
 all: controller hostpath-provisioner
 
@@ -36,22 +41,38 @@ hostpath-csi-driver:
 
 image: image-controller image-csi
 
-push: push-controller push-csi
+push: clean manifest manifest-push
 
-push-controller: hostpath-provisioner image
-	docker push $(DOCKER_REPO)/$(HPP_IMAGE):$(TAG)
+manifest: manifest-controller manifest-csi
+
+manifest-push: push-csi push-controller
 
 image-controller: hostpath-provisioner
-	docker build -t $(DOCKER_REPO)/$(HPP_IMAGE):$(TAG) -f Dockerfile.controller .
+	buildah build $(BUILDAH_PLATFORM_FLAG) -t $(DOCKER_REPO)/$(HPP_IMAGE):$(GOARCH) -f Dockerfile.controller .
 
 image-csi: hostpath-csi-driver
-	docker build -t $(DOCKER_REPO)/$(HPP_CSI_IMAGE):$(TAG) -f Dockerfile.csi .
+	buildah build $(BUILDAH_PLATFORM_FLAG) -t $(DOCKER_REPO)/$(HPP_CSI_IMAGE):$(GOARCH) -f Dockerfile.csi .
 
-push-csi: hostpath-csi-driver image-csi
-	docker push $(DOCKER_REPO)/$(HPP_CSI_IMAGE):$(TAG)
+manifest-controller: image-controller
+	-buildah manifest create $(DOCKER_REPO)/$(HPP_IMAGE):local
+	buildah manifest add --arch $(GOARCH) $(DOCKER_REPO)/$(HPP_IMAGE):local containers-storage:$(DOCKER_REPO)/$(HPP_IMAGE):$(GOARCH)
 
-clean:
+manifest-csi: image-csi
+	-buildah manifest create $(DOCKER_REPO)/$(HPP_CSI_IMAGE):local
+	buildah manifest add --arch $(GOARCH) $(DOCKER_REPO)/$(HPP_CSI_IMAGE):local containers-storage:$(DOCKER_REPO)/$(HPP_CSI_IMAGE):$(GOARCH)
+
+push-csi:
+	buildah manifest push $(BUILDAH_PUSH_FLAGS) --all $(DOCKER_REPO)/$(HPP_CSI_IMAGE):local docker://$(DOCKER_REPO)/$(HPP_CSI_IMAGE):$(TAG)
+
+push-controller:
+	buildah manifest push $(BUILDAH_PUSH_FLAGS) --all $(DOCKER_REPO)/$(HPP_IMAGE):local docker://$(DOCKER_REPO)/$(HPP_IMAGE):$(TAG)
+
+clean: manifest-clean
 	rm -rf _out
+
+manifest-clean:
+	-buildah manifest rm $(DOCKER_REPO)/$(HPP_IMAGE):local
+	-buildah manifest rm $(DOCKER_REPO)/$(HPP_CSI_IMAGE):local
 
 build: clean hostpath-provisioner hostpath-csi-driver
 
