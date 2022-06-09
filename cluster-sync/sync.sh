@@ -27,7 +27,7 @@ for i in $(seq 1 ${KUBEVIRT_NUM_NODES}); do
 done
 
 registry=${IMAGE_REGISTRY:-localhost:$(_port registry)}
-DOCKER_REPO=${registry} make push
+DOCKER_REPO=${registry} BUILDAH_PUSH_FLAGS="--tls-verify=false" make manifest manifest-push
 
 if [ ! -z $UPGRADE_FROM ]; then
   _kubectl apply -f https://github.com/kubevirt/hostpath-provisioner-operator/releases/download/$UPGRADE_FROM/namespace.yaml
