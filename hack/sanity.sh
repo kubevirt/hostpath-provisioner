@@ -19,7 +19,7 @@ source "${script_dir}"/common.sh
 setGoInProw $GOLANG_VER
 
 echo "docker repo: [$DOCKER_REPO]"
-go test -o _out/sanity.test -c -v ./sanity/...
+CGO_ENABLED=0 go test -o _out/sanity.test -c -v ./sanity/...
 docker build -t ${DOCKER_REPO}/sanity:test -f ./sanity/Dockerfile .
 # Need privileged so we can bind mount inside container, and hostpath capacity cannot change, so skipping that test
 docker run --privileged ${DOCKER_REPO}/sanity:test -ginkgo.noColor -ginkgo.skip="should fail when requesting to create a volume with already existing name and different capacity"
