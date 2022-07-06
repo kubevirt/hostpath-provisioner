@@ -111,8 +111,8 @@ func TestPrometheusMetrics(t *testing.T) {
 	t.Run("Operator Down", func(t *testing.T) {
 		testPrometheusRule(token, operatorUpQueryName, promRuleOperatorDown, t)
 	})
-	t.Run("Available Runbook URLS", func(t *testing.T) {
-		testPrometheusRunbookURLs(k8sClient)
+	t.Run("HPP alert rules", func(t *testing.T) {
+		testAlertRules(k8sClient)
 	})
 }
 
@@ -133,7 +133,7 @@ func testPrometheusRule(token, promQuery, value string, t *testing.T) {
 	}, 2*time.Minute, 1*time.Second).Should(BeTrue())
 }
 
-func testPrometheusRunbookURLs(k8sClient *kubernetes.Clientset) {
+func testAlertRules(k8sClient *kubernetes.Clientset) {
 	var promRule monitoringv1.PrometheusRule
 	err := k8sClient.RESTClient().Get().
 		Resource("prometheusrules").
@@ -150,11 +150,12 @@ func testPrometheusRunbookURLs(k8sClient *kubernetes.Clientset) {
 			for _, rule := range group.Rules {
 				if len(rule.Alert) > 0 {
 					Expect(rule.Annotations).ToNot(BeNil())
-					url, ok := rule.Annotations["runbook_url"]
-					Expect(ok).To(BeTrue())
-					resp, err := http.Head(url)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(resp.StatusCode).Should(Equal(http.StatusOK))
+					Expect(rule.Labels).ToNot(BeNil())
+					checkForRunbookURL(rule)
+					checkForSummary(rule)
+					checkForSeverityLabel(rule)
+					checkForPartOfLabel(rule)
+					checkForComponentLabel(rule)
 				}
 			}
 		}
@@ -252,4 +253,36 @@ func scaleOperator(k8sClient *kubernetes.Clientset, count *int32) error {
 	}, 1*time.Minute, time.Second).Should(Equal(*count))
 
 	return nil
+}
+
+func checkForRunbookURL(rule monitoringv1.Rule) {
+	url, ok := rule.Annotations["runbook_url"]
+	Expect(ok).To(BeTrue(), fmt.Sprintf("%s does not have runbook_url annotation", rule.Alert))
+	resp, err := http.Head(url)
+	Expect(err).ToNot(HaveOccurred(), fmt.Sprintf("%s runbook is not available", rule.Alert))
+	Expect(resp.StatusCode).Should(Equal(http.StatusOK), fmt.Sprintf("%s runbook is not available", rule.Alert))
+}
+
+func checkForSummary(rule monitoringv1.Rule) {
+	summary, ok := rule.Annotations["summary"]
+	Expect(ok).To(BeTrue(), fmt.Sprintf("%s does not have summary annotation", rule.Alert))
+	Expect(summary).ToNot(BeEmpty(), fmt.Sprintf("%s has an empty summary", rule.Alert))
+}
+
+func checkForSeverityLabel(rule monitoringv1.Rule) {
+	severity, ok := rule.Labels["severity"]
+	Expect(ok).To(BeTrue(), fmt.Sprintf("%s does not have severity label", rule.Alert))
+	Expect(severity).To(BeElementOf("info", "warning", "critical"), fmt.Sprintf("%s severity label is not valid", rule.Alert))
+}
+
+func checkForPartOfLabel(rule monitoringv1.Rule) {
+	kubernetesOperatorPartOf, ok := rule.Labels["kubernetes_operator_part_of"]
+	Expect(ok).To(BeTrue(), fmt.Sprintf("%s does not have kubernetes_operator_part_of label", rule.Alert))
+	Expect(kubernetesOperatorPartOf).To(Equal("kubevirt"), fmt.Sprintf("%s kubernetes_operator_part_of label is not valid", rule.Alert))
+}
+
+func checkForComponentLabel(rule monitoringv1.Rule) {
+	kubernetesOperatorComponent, ok := rule.Labels["kubernetes_operator_component"]
+	Expect(ok).To(BeTrue(), fmt.Sprintf("%s does not have kubernetes_operator_component label", rule.Alert))
+	Expect(kubernetesOperatorComponent).To(Equal("hostpath-provisioner-operator"), fmt.Sprintf("%s kubernetes_operator_component label is not valid", rule.Alert))
 }
