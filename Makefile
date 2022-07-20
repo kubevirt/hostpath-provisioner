@@ -24,12 +24,14 @@ GOLANG_VER?=1.18.2
 GOOS?=linux
 GOARCH?=amd64
 BUILDAH_PLATFORM_FLAG?=--platform $(GOOS)/$(GOARCH)
+OCI_BIN ?= $(shell if podman ps >/dev/null 2>&1; then echo podman; elif docker ps >/dev/null 2>&1; then echo docker; fi)
 
 export GOLANG_VER
 export KUBEVIRT_PROVIDER
 export DOCKER_REPO
 export GOOS
 export GOARCH
+export OCI_BIN
 
 all: controller hostpath-provisioner
 
