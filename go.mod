@@ -24,7 +24,7 @@ require (
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 	kubevirt.io/hostpath-provisioner-operator v0.13.0
 	sigs.k8s.io/controller-runtime v0.12.1
-	sigs.k8s.io/sig-storage-lib-external-provisioner/v6 v6.0.0
+	sigs.k8s.io/sig-storage-lib-external-provisioner/v6 v6.3.0
 )
 
 replace (
