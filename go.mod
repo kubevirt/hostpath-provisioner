@@ -7,8 +7,8 @@ require (
 	github.com/coreos/prometheus-operator v0.38.1-0.20200424145508-7e176fda06cc
 	github.com/golang/protobuf v1.5.2
 	github.com/kubernetes-csi/csi-lib-utils v0.10.0
-	github.com/kubernetes-csi/csi-test/v4 v4.2.0
-	github.com/onsi/gomega v1.18.1
+	github.com/kubernetes-csi/csi-test/v4 v4.4.0
+	github.com/onsi/gomega v1.19.0
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
