@@ -62,7 +62,11 @@ fi
 echo "install hpp"
 registry=${IMAGE_REGISTRY:-localhost:$(_port registry)}
 echo "registry: ${registry}"
-DOCKER_REPO=${registry} BUILDAH_PUSH_FLAGS="--tls-verify=false" make manifest manifest-push
+if [[ ${registry} == localhost* ]]; then
+  echo "not verifying tls, registry contains localhost"
+  export BUILDAH_PUSH_FLAGS="--tls-verify=false"
+fi
+DOCKER_REPO=${registry} make manifest manifest-push
 
 #install hpp
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/namespace.yaml
