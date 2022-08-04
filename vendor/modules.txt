@@ -678,7 +678,7 @@ k8s.io/kube-openapi/pkg/schemamutation
 k8s.io/kube-openapi/pkg/spec3
 k8s.io/kube-openapi/pkg/util/proto
 k8s.io/kube-openapi/pkg/validation/spec
-# k8s.io/kubernetes v1.24.0
+# k8s.io/kubernetes v1.24.3
 ## explicit
 k8s.io/kubernetes/pkg/features
 k8s.io/kubernetes/pkg/kubelet/server/metrics
