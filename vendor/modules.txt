@@ -116,7 +116,7 @@ github.com/onsi/ginkgo/reporters/stenographer
 github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable
 github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty
 github.com/onsi/ginkgo/types
-# github.com/onsi/gomega v1.19.0 => github.com/onsi/gomega v1.10.1
+# github.com/onsi/gomega v1.20.0 => github.com/onsi/gomega v1.10.1
 ## explicit
 github.com/onsi/gomega
 github.com/onsi/gomega/format
@@ -155,7 +155,7 @@ github.com/prometheus/procfs/internal/util
 github.com/spf13/pflag
 # golang.org/x/crypto v0.0.0-20220214200702-86341886e292
 golang.org/x/crypto/ed25519
-# golang.org/x/net v0.0.0-20220225172249-27dd8689420f
+# golang.org/x/net v0.0.0-20220722155237-a158d28d115b
 ## explicit
 golang.org/x/net/bpf
 golang.org/x/net/context
@@ -176,7 +176,7 @@ golang.org/x/net/trace
 # golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
+# golang.org/x/sys v0.0.0-20220818161305-2296e01440c6
 ## explicit
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/plan9
@@ -314,7 +314,7 @@ gopkg.in/inf.v0
 gopkg.in/tomb.v1
 # gopkg.in/yaml.v2 v2.4.0 => gopkg.in/yaml.v2 v2.4.0
 gopkg.in/yaml.v2
-# gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+# gopkg.in/yaml.v3 v3.0.1
 gopkg.in/yaml.v3
 # k8s.io/api v0.24.2 => k8s.io/api v0.24.0
 ## explicit
@@ -702,7 +702,7 @@ k8s.io/utils/net
 k8s.io/utils/pointer
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
-# kubevirt.io/hostpath-provisioner-operator v0.13.0
+# kubevirt.io/hostpath-provisioner-operator v0.14.0
 ## explicit
 kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner
 kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1alpha1

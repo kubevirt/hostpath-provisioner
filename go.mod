@@ -8,11 +8,11 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/kubernetes-csi/csi-lib-utils v0.11.0
 	github.com/kubernetes-csi/csi-test/v4 v4.4.0
-	github.com/onsi/gomega v1.19.0
+	github.com/onsi/gomega v1.20.0
 	github.com/prometheus/client_golang v1.13.0
 	github.com/prometheus/client_model v0.2.0
-	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
-	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
+	golang.org/x/net v0.0.0-20220722155237-a158d28d115b
+	golang.org/x/sys v0.0.0-20220818161305-2296e01440c6
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 	google.golang.org/grpc v1.48.0
 	k8s.io/api v0.24.2
@@ -22,7 +22,7 @@ require (
 	k8s.io/klog/v2 v2.70.1
 	k8s.io/kubernetes v1.24.4
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
-	kubevirt.io/hostpath-provisioner-operator v0.13.0
+	kubevirt.io/hostpath-provisioner-operator v0.14.0
 	sigs.k8s.io/controller-runtime v0.12.3
 	sigs.k8s.io/sig-storage-lib-external-provisioner/v6 v6.3.0
 )
