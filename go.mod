@@ -20,8 +20,8 @@ require (
 	k8s.io/apimachinery v0.24.2
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/klog/v2 v2.70.1
-	k8s.io/kubernetes v1.24.4
-	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
+	k8s.io/kubernetes v1.25.0
+	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed
 	kubevirt.io/hostpath-provisioner-operator v0.14.0
 	sigs.k8s.io/controller-runtime v0.12.3
 	sigs.k8s.io/sig-storage-lib-external-provisioner/v6 v6.3.0
