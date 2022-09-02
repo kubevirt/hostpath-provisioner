@@ -659,7 +659,7 @@ k8s.io/component-base/featuregate
 k8s.io/component-base/metrics
 k8s.io/component-base/metrics/legacyregistry
 k8s.io/component-base/version
-# k8s.io/klog/v2 v2.70.1
+# k8s.io/klog/v2 v2.80.0
 ## explicit
 k8s.io/klog/v2
 k8s.io/klog/v2/internal/buffer
