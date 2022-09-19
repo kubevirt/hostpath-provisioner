@@ -1,5 +1,8 @@
+//go:build !go1.19
+// +build !go1.19
+
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,12 +17,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-Package controller provides types and functions for building Controllers.  Controllers implement Kubernetes APIs.
+package exec
 
-# Creation
+import (
+	osexec "os/exec"
+)
 
-To create a new Controller, first create a manager.Manager and pass it to the controller.New function.
-The Controller MUST be started by calling Manager.Start.
-*/
-package controller
+func maskErrDotCmd(cmd *osexec.Cmd) *osexec.Cmd {
+	return cmd
+}
+
+func maskErrDot(err error) error {
+	return err
+}
