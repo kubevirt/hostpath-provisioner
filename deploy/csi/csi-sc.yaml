@@ -3,4 +3,6 @@ kind: StorageClass
 metadata:
   name: csi-hostpath-provisioner
 provisioner: kubevirt.io.hostpath-provisioner
+parameters:
+  storagePool: local
 volumeBindingMode: WaitForFirstConsumer
