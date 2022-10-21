@@ -25,6 +25,10 @@ import (
 	"kubevirt.io/hostpath-provisioner/pkg/hostpath"
 )
 
+const (
+	defaultDatadirTuple = `[{"name": "local", "path": "/csi-data-dir"}]`
+)
+
 func init() {
 }
 
@@ -36,7 +40,7 @@ func main() {
 	flag.Set("logtostderr", "true")
 	flag.StringVar(&cfg.Endpoint, "endpoint", "unix://tmp/csi.sock", "CSI endpoint")
 	flag.StringVar(&cfg.DriverName, "drivername", "hostpath.csi.kubevirt.io", "name of the driver")
-	flag.StringVar(&dataDir, "datadir", "/csi-data-dir", "storage pool name/path tupels that indicate which storage pool name is associated with which path, in JSON format. Example: [{\"name\":\"local\",\"path\":\"/var/hpvolumes\"}]")
+	flag.StringVar(&dataDir, "datadir", defaultDatadirTuple, "storage pool name/path tupels that indicate which storage pool name is associated with which path, in JSON format. Example: [{\"name\":\"local\",\"path\":\"/var/hpvolumes\"}]")
 	flag.StringVar(&cfg.NodeID, "nodeid", "", "node id")
 	flag.StringVar(&cfg.Version, "version", "", "version of the plugin")
 	flag.Parse()
