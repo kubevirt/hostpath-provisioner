@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -31,6 +32,9 @@ import (
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 
 	. "github.com/onsi/gomega"
+
+	hostpathprovisionerv1 "kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1"
+	hostpathprovisioner "kubevirt.io/hostpath-provisioner-operator/pkg/client/clientset/versioned"
 
 	extclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -60,6 +64,7 @@ type promQueryResult struct {
 type promData struct {
 	ResultType string       `json:"resultType"`
 	Result     []promResult `json:"result"`
+	Alerts     []promAlert  `json:"alerts"`
 }
 
 type promResult struct {
@@ -67,27 +72,20 @@ type promResult struct {
 	Value  []interface{} `json:"value"`
 }
 
+type promAlert struct {
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
+	State       string            `json:"state"`
+	Value       string            `json:"value"`
+}
+
 type promMetric struct {
 	Name string `json:"__name__"`
 }
 
 func TestPrometheusMetrics(t *testing.T) {
-	RegisterTestingT(t)
-	tearDown, _, k8sClient := setupTestCaseNs(t)
-	defer tearDown(t)
-	defer func() {
-		err := scaleOperatorUp(k8sClient)
-		Expect(err).ToNot(HaveOccurred(), "Unable to scale operator back up.")
-	}()
-	extClient, err := getExtClient()
-	Expect(err).ToNot(HaveOccurred())
+	k8sClient, _, token := prometheusTestSetup(t)
 
-	if !IsPrometheusAvailable(extClient) {
-		t.Skip("Skipping because prometheus is not available")
-	}
-	token, err := getPrometheusSaToken(k8sClient)
-	Expect(err).ToNot(HaveOccurred())
-	Expect(token).ToNot(BeEmpty())
 	t.Run("Operator Up", func(t *testing.T) {
 		testPrometheusRule(token, operatorUpQueryName, promRuleOperatorUp, t)
 	})
@@ -106,7 +104,7 @@ func TestPrometheusMetrics(t *testing.T) {
 		}
 		testPrometheusRule(token, hppPoolSharedQueryName, promRulePoolShared, t)
 	})
-	err = scaleOperatorDown(k8sClient)
+	err := scaleOperatorDown(k8sClient)
 	Expect(err).ToNot(HaveOccurred())
 	t.Run("Operator Down", func(t *testing.T) {
 		testPrometheusRule(token, operatorUpQueryName, promRuleOperatorDown, t)
@@ -114,6 +112,75 @@ func TestPrometheusMetrics(t *testing.T) {
 	t.Run("HPP alert rules", func(t *testing.T) {
 		testAlertRules(k8sClient)
 	})
+}
+
+func TestPrometheusAlerts(t *testing.T) {
+	k8sClient, hppClient, token := prometheusTestSetup(t)
+
+	hpp, err := hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Get(context.Background(), "hostpath-provisioner", metav1.GetOptions{})
+	Expect(err).ToNot(HaveOccurred())
+	hpp.ResourceVersion = ""
+	hpp.UID = ""
+	hpp.Status = hostpathprovisionerv1.HostPathProvisionerStatus{}
+
+	t.Run("HPPOperatorDown", func(t *testing.T) {
+		err = scaleOperatorDown(k8sClient)
+		Expect(err).ToNot(HaveOccurred())
+
+		testPrometheusAlert("HPPOperatorDown", token, t)
+
+		err = scaleOperatorUp(k8sClient)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	t.Run("HPPNotReady", func(t *testing.T) {
+		oldNodeSelector := hpp.Spec.Workload.NodeSelector
+		hpp.Spec.Workload.NodeSelector = map[string]string{"non-existing": "label"}
+
+		err = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Delete(context.Background(), "hostpath-provisioner", metav1.DeleteOptions{})
+		Expect(err).ToNot(HaveOccurred())
+
+		Eventually(func() error {
+			_, err = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Create(context.Background(), hpp, metav1.CreateOptions{})
+			return err
+		}, 1*time.Minute, 5*time.Second).ShouldNot(HaveOccurred())
+
+		testPrometheusAlert("HPPNotReady", token, t)
+
+		hpp.Spec.Workload.NodeSelector = oldNodeSelector
+		_ = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Delete(context.Background(), "hostpath-provisioner", metav1.DeleteOptions{})
+		Eventually(func() error {
+			_, err = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Create(context.Background(), hpp, metav1.CreateOptions{})
+			return err
+		}, 1*time.Minute, 5*time.Second).ShouldNot(HaveOccurred())
+	})
+
+	_ = scaleOperatorUp(k8sClient)
+	_, _ = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Create(context.Background(), hpp, metav1.CreateOptions{})
+}
+
+func prometheusTestSetup(t *testing.T) (*kubernetes.Clientset, *hostpathprovisioner.Clientset, string) {
+	RegisterTestingT(t)
+	tearDown, _, k8sClient := setupTestCaseNs(t)
+	defer tearDown(t)
+	defer func() {
+		err := scaleOperatorUp(k8sClient)
+		Expect(err).ToNot(HaveOccurred(), "Unable to scale operator back up.")
+	}()
+	extClient, err := getExtClient()
+	Expect(err).ToNot(HaveOccurred())
+
+	if !IsPrometheusAvailable(extClient) {
+		t.Skip("Skipping because prometheus is not available")
+	}
+	token, err := getPrometheusSaToken(k8sClient)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(token).ToNot(BeEmpty())
+
+	hppClient, err := getHPPClient()
+	Expect(err).ToNot(HaveOccurred())
+
+	return k8sClient, hppClient, token
 }
 
 func testPrometheusRule(token, promQuery, value string, t *testing.T) {
@@ -285,4 +352,30 @@ func checkForComponentLabel(rule monitoringv1.Rule) {
 	kubernetesOperatorComponent, ok := rule.Labels["kubernetes_operator_component"]
 	Expect(ok).To(BeTrue(), fmt.Sprintf("%s does not have kubernetes_operator_component label", rule.Alert))
 	Expect(kubernetesOperatorComponent).To(Equal("hostpath-provisioner-operator"), fmt.Sprintf("%s kubernetes_operator_component label is not valid", rule.Alert))
+}
+
+func testPrometheusAlert(alertName string, token string, t *testing.T) {
+	prometheusURL := fmt.Sprintf("%s/api/v1/alerts", getPrometheusBaseURL())
+	promUrl, err := url.Parse(prometheusURL)
+	Expect(err).ToNot(HaveOccurred())
+	var result promQueryResult
+
+	Eventually(func() error {
+		bodyBytes := makePrometheusHTTPRequest(promUrl, token)
+		t.Logf("body: %s", bodyBytes)
+		err = json.Unmarshal(bodyBytes, &result)
+		if err != nil {
+			return err
+		}
+
+		for _, r := range result.Data.Alerts {
+			t.Logf("alertname: %s, state: %s", r.Labels["alertname"], r.State)
+
+			if r.Labels["alertname"] == alertName && (r.State == "firing" || r.State == "pending") {
+				return nil
+			}
+		}
+
+		return errors.New(fmt.Sprintf("alert %s not found or not firing", alertName))
+	}, 10*time.Minute, 1*time.Minute).Should(Not(HaveOccurred()))
 }
