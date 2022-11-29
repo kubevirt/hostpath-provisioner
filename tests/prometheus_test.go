@@ -87,10 +87,10 @@ func TestPrometheusMetrics(t *testing.T) {
 	k8sClient, _, token := prometheusTestSetup(t)
 
 	t.Run("Operator Up", func(t *testing.T) {
-		testPrometheusRule(token, operatorUpQueryName, promRuleOperatorUp, t)
+		testPrometheusRule(token, operatorUpQueryName, promRuleOperatorUp)
 	})
 	t.Run("HPP CR ready", func(t *testing.T) {
-		testPrometheusRule(token, hppCRReadyQueryName, promRuleCRReady, t)
+		testPrometheusRule(token, hppCRReadyQueryName, promRuleCRReady)
 	})
 	t.Run("HPP pool sharing path with OS", func(t *testing.T) {
 		promRulePoolShared := "0"
@@ -102,12 +102,12 @@ func TestPrometheusMetrics(t *testing.T) {
 		if shared {
 			promRulePoolShared = "1"
 		}
-		testPrometheusRule(token, hppPoolSharedQueryName, promRulePoolShared, t)
+		testPrometheusRule(token, hppPoolSharedQueryName, promRulePoolShared)
 	})
 	err := scaleOperatorDown(k8sClient)
 	Expect(err).ToNot(HaveOccurred())
 	t.Run("Operator Down", func(t *testing.T) {
-		testPrometheusRule(token, operatorUpQueryName, promRuleOperatorDown, t)
+		testPrometheusRule(token, operatorUpQueryName, promRuleOperatorDown)
 	})
 	t.Run("HPP alert rules", func(t *testing.T) {
 		testAlertRules(k8sClient)
@@ -183,14 +183,13 @@ func prometheusTestSetup(t *testing.T) (*kubernetes.Clientset, *hostpathprovisio
 	return k8sClient, hppClient, token
 }
 
-func testPrometheusRule(token, promQuery, value string, t *testing.T) {
+func testPrometheusRule(token, promQuery, value string) {
 	prometheusURL := fmt.Sprintf("%s/api/v1/query?query=%s", getPrometheusBaseURL(), promQuery)
 	url, err := url.Parse(prometheusURL)
 	Expect(err).ToNot(HaveOccurred())
 	var result promQueryResult
 	Eventually(func() bool {
 		bodyBytes := makePrometheusHTTPRequest(url, token)
-		t.Logf("body: %s", bodyBytes)
 		err := json.Unmarshal(bodyBytes, &result)
 		Expect(err).ToNot(HaveOccurred())
 		return len(result.Data.Result) > 0 &&
