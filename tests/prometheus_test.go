@@ -89,12 +89,21 @@ func TestPrometheusMetrics(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(token).ToNot(BeEmpty())
 	t.Run("Operator Up", func(t *testing.T) {
-		testPrometheusRule(token, operatorUpQueryName, promRuleOperatorUp, t)
+		RegisterTestingT(t)
+		tearDown, _, _ := setupTestCaseNs(t)
+		defer tearDown(t)
+		testPrometheusRule(token, operatorUpQueryName, promRuleOperatorUp)
 	})
 	t.Run("HPP CR ready", func(t *testing.T) {
-		testPrometheusRule(token, hppCRReadyQueryName, promRuleCRReady, t)
+		RegisterTestingT(t)
+		tearDown, _, _ := setupTestCaseNs(t)
+		defer tearDown(t)
+		testPrometheusRule(token, hppCRReadyQueryName, promRuleCRReady)
 	})
 	t.Run("HPP pool sharing path with OS", func(t *testing.T) {
+		RegisterTestingT(t)
+		tearDown, _, _ := setupTestCaseNs(t)
+		defer tearDown(t)
 		promRulePoolShared := "0"
 		backingStorage := os.Getenv("KUBEVIRT_STORAGE")
 		hppCrType := os.Getenv("HPP_CR_TYPE")
@@ -104,26 +113,31 @@ func TestPrometheusMetrics(t *testing.T) {
 		if shared {
 			promRulePoolShared = "1"
 		}
-		testPrometheusRule(token, hppPoolSharedQueryName, promRulePoolShared, t)
+		testPrometheusRule(token, hppPoolSharedQueryName, promRulePoolShared)
 	})
 	err = scaleOperatorDown(k8sClient)
 	Expect(err).ToNot(HaveOccurred())
 	t.Run("Operator Down", func(t *testing.T) {
-		testPrometheusRule(token, operatorUpQueryName, promRuleOperatorDown, t)
+		RegisterTestingT(t)
+		tearDown, _, _ := setupTestCaseNs(t)
+		defer tearDown(t)
+		testPrometheusRule(token, operatorUpQueryName, promRuleOperatorDown)
 	})
 	t.Run("HPP alert rules", func(t *testing.T) {
+		RegisterTestingT(t)
+		tearDown, _, _ := setupTestCaseNs(t)
+		defer tearDown(t)
 		testAlertRules(k8sClient)
 	})
 }
 
-func testPrometheusRule(token, promQuery, value string, t *testing.T) {
+func testPrometheusRule(token, promQuery, value string) {
 	prometheusURL := fmt.Sprintf("%s/api/v1/query?query=%s", getPrometheusBaseURL(), promQuery)
 	url, err := url.Parse(prometheusURL)
 	Expect(err).ToNot(HaveOccurred())
 	var result promQueryResult
 	Eventually(func() bool {
 		bodyBytes := makePrometheusHTTPRequest(url, token)
-		t.Logf("body: %s", bodyBytes)
 		err := json.Unmarshal(bodyBytes, &result)
 		Expect(err).ToNot(HaveOccurred())
 		return len(result.Data.Result) > 0 &&
@@ -165,10 +179,7 @@ func testAlertRules(k8sClient *kubernetes.Clientset) {
 // IsPrometheusAvailable decides whether or not we will run prometheus alert/metric tests
 func IsPrometheusAvailable(client *extclientset.Clientset) bool {
 	_, err := client.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), prometheusCRDName, metav1.GetOptions{})
-	if k8serrors.IsNotFound(err) {
-		return false
-	}
-	return true
+	return !k8serrors.IsNotFound(err)
 }
 
 func getPrometheusBaseURL() string {
