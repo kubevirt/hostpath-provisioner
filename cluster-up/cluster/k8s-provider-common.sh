@@ -9,32 +9,45 @@ source "${KUBEVIRTCI_PATH}/cluster/ephemeral-provider-common.sh"
 #if UNLIMITEDSWAP is set to true - Kubernetes workloads can use as much swap memory as they request, up to the system limit.
 #otherwise Kubernetes workloads can use as much swap memory as they request, up to the system limit by default
 function configure_swap_memory () {
-  if [ "$KUBEVIRT_SWAP_ON" == "true" ] && [[  ($KUBEVIRT_PROVIDER =~ k8s-1\.1.*) ||  ($KUBEVIRT_PROVIDER =~ k8s-1.20) ||  ($KUBEVIRT_PROVIDER =~ k8s-1.21) ]]; then
-      echo "ERROR: swap is not supported on kubevirtci version < 1.22"
-      exit 1
+    if [ "$KUBEVIRT_SWAP_ON" == "true" ] ;then
+      for nodeNum in $(seq -f "%02g" 1 $KUBEVIRT_NUM_NODES); do
+          if [ ! -z $KUBEVIRT_SWAP_SIZE_IN_GB  ]; then
+            $ssh node${nodeNum} -- sudo dd if=/dev/zero of=/swapfile count=$KUBEVIRT_SWAP_SIZE_IN_GB bs=1G
+            $ssh node${nodeNum} -- sudo mkswap /swapfile
+          fi
 
-  elif [ "$KUBEVIRT_SWAP_ON" == "true" ] ;then
+          $ssh node${nodeNum} -- sudo swapon -a
 
-    for nodeNum in $(seq -f "%02g" 1 $KUBEVIRT_NUM_NODES); do
-        if [ ! -z $KUBEVIRT_SWAP_SIZE_IN_GB  ]; then
-          $ssh node${nodeNum} -- sudo dd if=/dev/zero of=/swapfile count=$KUBEVIRT_SWAP_SIZE_IN_GB bs=1G
-          $ssh node${nodeNum} -- sudo mkswap /swapfile
-        fi
+          if [ ! -z $KUBEVIRT_SWAPPINESS ]; then
+            $ssh node${nodeNum} -- "sudo /bin/su -c \"echo vm.swappiness = $KUBEVIRT_SWAPPINESS >> /etc/sysctl.conf\""
+            $ssh node${nodeNum} -- sudo sysctl vm.swappiness=$KUBEVIRT_SWAPPINESS
+          fi
 
-        $ssh node${nodeNum} -- sudo swapon -a
+          if [ $KUBEVIRT_UNLIMITEDSWAP == "true" ]; then
+            $ssh node${nodeNum} -- "sudo sed -i ':a;N;\$!ba;s/memorySwap: {}/memorySwap:\n  swapBehavior: UnlimitedSwap/g'  /var/lib/kubelet/config.yaml"
+            $ssh node${nodeNum} -- sudo systemctl restart kubelet
+          fi
+      done
+    fi
+}
 
-        if [ ! -z $KUBEVIRT_SWAPPINESS ]; then
-          $ssh node${nodeNum} -- "sudo /bin/su -c \"echo vm.swappiness = $KUBEVIRT_SWAPPINESS >> /etc/sysctl.conf\""
-          $ssh node${nodeNum} -- sudo sysctl vm.swappiness=$KUBEVIRT_SWAPPINESS
-        fi
+function configure_ksm_module () {
+    if [ "$KUBEVIRT_KSM_ON" == "true" ] ;then
+      for nodeNum in $(seq -f "%02g" 1 $KUBEVIRT_NUM_NODES); do
+        $ssh node${nodeNum} -- "echo 1 | sudo tee /sys/kernel/mm/ksm/run >/dev/null"
+          if [ ! -z $KUBEVIRT_KSM_SLEEP_BETWEEN_SCANS_MS ]; then
+            $ssh node${nodeNum} -- "echo ${KUBEVIRT_KSM_SLEEP_BETWEEN_SCANS_MS} | sudo tee /sys/kernel/mm/ksm/sleep_millisecs >/dev/null "
+          fi
+          if [ ! -z $KUBEVIRT_KSM_PAGES_TO_SCAN ]; then
+            $ssh node${nodeNum} -- "echo ${KUBEVIRT_KSM_PAGES_TO_SCAN} | sudo tee /sys/kernel/mm/ksm/pages_to_scan >/dev/null "
+          fi
+      done
+    fi
+}
 
-        if [ $KUBEVIRT_UNLIMITEDSWAP == "true" ]; then
-          $ssh node${nodeNum} -- "sudo sed -i ':a;N;\$!ba;s/memorySwap: {}/memorySwap:\n  swapBehavior: UnlimitedSwap/g'  /var/lib/kubelet/config.yaml"
-          $ssh node${nodeNum} -- sudo systemctl restart kubelet
-        fi
-  done
-fi
-
+function configure_memory_overcommitment_behavior () {
+  configure_swap_memory
+  configure_ksm_module
 }
 
 function deploy_cnao() {
@@ -62,11 +75,7 @@ function wait_for_cnao_ready() {
 }
 
 function deploy_istio() {
-    if [ "$KUBEVIRT_DEPLOY_ISTIO" == "true" ] && [[ $KUBEVIRT_PROVIDER =~ k8s-1\.1.* ]]; then
-        echo "ERROR: Istio is not supported on kubevirtci version < 1.20"
-        exit 1
-
-    elif [ "$KUBEVIRT_DEPLOY_ISTIO" == "true" ]; then
+    if [ "$KUBEVIRT_DEPLOY_ISTIO" == "true" ]; then
         if [ "$KUBEVIRT_WITH_CNAO" == "true" ]; then
             $kubectl create -f /opt/istio/istio-operator-with-cnao.cr.yaml
         else
@@ -96,6 +105,16 @@ function wait_for_istio_ready() {
     fi
 }
 
+# copy_istio_cni_conf_files copy the generated Istio CNI net conf file
+# (at '/etc/cni/multus/net.d/') to where Multus expect CNI net conf files ('/etc/cni/net.d/')
+function copy_istio_cni_conf_files() {
+    if [ "$KUBEVIRT_DEPLOY_ISTIO" == "true" ] && [ "$KUBEVIRT_WITH_CNAO" == "true" ]; then
+        for nodeNum in $(seq -f "%02g" 1 $KUBEVIRT_NUM_NODES); do
+            $ssh node${nodeNum} -- sudo cp -uv /etc/cni/multus/net.d/*istio*.conf /etc/cni/net.d/
+        done
+    fi
+}
+
 function deploy_cdi() {
     if [ "$KUBEVIRT_DEPLOY_CDI" == "true" ]; then
         $kubectl create -f /opt/cdi-*-operator.yaml
@@ -121,22 +140,22 @@ function up() {
     fi
     eval ${_cli:?} run $params
 
-    # Copy k8s config and kubectl
-    # Workaround https://github.com/containers/conmon/issues/315 by not dumping the file to stdout for the time being
-    if [[ ${_cri_bin} = podman* ]]; then
-        ${_cli} scp --prefix ${provider_prefix:?} /usr/bin/kubectl /kubevirtci_config/.kubectl
-        ${_cli} scp --prefix $provider_prefix /etc/kubernetes/admin.conf /kubevirtci_config/.kubeconfig
-    else
-        ${_cli} scp --prefix ${provider_prefix:?} /usr/bin/kubectl - >${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl
-        ${_cli} scp --prefix $provider_prefix /etc/kubernetes/admin.conf - >${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubeconfig
-    fi
-
-    chmod u+x ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl
+    ${_cli} scp --prefix $provider_prefix /etc/kubernetes/admin.conf - >${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubeconfig
 
     # Set server and disable tls check
     export KUBECONFIG=${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubeconfig
-    ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl config set-cluster kubernetes --server="https://$(_main_ip):$(_port k8s)"
-    ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl config set-cluster kubernetes --insecure-skip-tls-verify=true
+    kubectl config set-cluster kubernetes --server="https://$(_main_ip):$(_port k8s)"
+    kubectl config set-cluster kubernetes --insecure-skip-tls-verify=true
+
+    # Workaround https://github.com/containers/conmon/issues/315 by not dumping the file to stdout for the time being
+    if [[ ${_cri_bin} = podman* ]]; then
+        k8s_version=$(kubectl get node node01 --no-headers -o=custom-columns=VERSION:.status.nodeInfo.kubeletVersion)
+        curl -Ls "https://dl.k8s.io/release/${k8s_version}/bin/linux/amd64/kubectl" -o ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl
+    else
+        ${_cli} scp --prefix ${provider_prefix:?} /usr/bin/kubectl - >${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl
+    fi
+
+    chmod u+x ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl
 
     # Make sure that local config is correct
     prepare_config
@@ -152,7 +171,7 @@ function up() {
     fi
     $kubectl label node -l $label node-role.kubernetes.io/worker=''
 
-    configure_swap_memory
+    configure_memory_overcommitment_behavior
 
     deploy_cnao
     deploy_istio
@@ -163,4 +182,8 @@ function up() {
         sleep 5
     done
 
+    # FIXME: remove 'copy_istio_cni_conf_files()' as soon as [1] and [2] are resolved
+    # [1] https://github.com/kubevirt/kubevirtci/issues/906
+    # [2] https://github.com/k8snetworkplumbingwg/multus-cni/issues/982
+    copy_istio_cni_conf_files
 }

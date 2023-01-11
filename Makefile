@@ -14,13 +14,13 @@
 
 .PHONY: cluster-up cluster-down cluster-sync cluster-clean
 
-KUBEVIRT_PROVIDER?=k8s-1.23
+KUBEVIRT_PROVIDER?=k8s-1.25
 HPP_IMAGE?=hostpath-provisioner
 HPP_CSI_IMAGE?=hostpath-csi-driver
 TAG?=latest
 DOCKER_REPO?=quay.io/kubevirt
 ARTIFACTS_PATH?=_out
-GOLANG_VER?=1.18.6
+GOLANG_VER?=1.19.4
 GOOS?=linux
 GOARCH?=amd64
 BUILDAH_PLATFORM_FLAG?=--platform $(GOOS)/$(GOARCH)

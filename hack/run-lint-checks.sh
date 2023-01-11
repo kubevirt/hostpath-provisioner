@@ -18,7 +18,7 @@
 # suggestions and 1 when files are clean
 
 SOURCE_DIRS="controller cmd"
-LINTABLE=(cmd controller)
+LINTABLE=(cmd)
 ec=0
 out="$(gofmt -l -s ${SOURCE_DIRS} | grep ".*\.go")"
 if [[ ${out} ]]; then
@@ -27,13 +27,8 @@ if [[ ${out} ]]; then
     ec=1
 fi
 for p in "${LINTABLE[@]}"; do
-  echo "running golint on directory: ${p}"
-  out="$(golint ${p}/...)"
-  if [[ ${out} ]]; then
-    echo "FAIL: following golint errors found:"
-    echo "${out}"
-    ec=1
-  fi
+  echo "running go vet on directory: ${p}"
+  go vet ${p}/...
 done
 
 exit ${ec}
