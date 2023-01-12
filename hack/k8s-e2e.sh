@@ -17,18 +17,9 @@ source ./cluster-up/hack/common.sh
 source ./cluster-up/cluster/${KUBEVIRT_PROVIDER}/provider.sh
 
 export KUBEVIRT_NUM_NODES=2
-export KUBEVIRT_PROVIDER=k8s-1.23
+export KUBEVIRT_PROVIDER=k8s-1.25
 make cluster-down
 make cluster-up
-
-if ! command -v go &> /dev/null
-then
-  wget https://dl.google.com/go/go1.16.7.linux-amd64.tar.gz
-  tar -xzf go1.16.7.linux-amd64.tar.gz
-  export GOROOT=$PWD/go
-  export PATH=$GOROOT/bin:$PATH
-  echo $PATH
-fi
 
 if ! command -v sshuttle &> /dev/null
 then
