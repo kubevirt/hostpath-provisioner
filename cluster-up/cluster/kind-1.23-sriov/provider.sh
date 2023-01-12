@@ -13,13 +13,9 @@ else
     export HOST_PORT=$ALTERNATE_HOST_PORT
 fi
 
-#'kubevirt-test-default1' is the default namespace of
-# Kubevirt SRIOV tests where the SRIOV VM's will be created.
-SRIOV_TESTS_NS="${SRIOV_TESTS_NS:-kubevirt-test-default1}"
-
 function set_kind_params() {
-    export KIND_VERSION="${KIND_VERSION:-0.11.1}"
-    export KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-quay.io/kubevirtci/kindest_node:v1.22.2@sha256:f638a08c1f68fe2a99e724ace6df233a546eaf6713019a0b310130a4f91ebe7f}"
+    export KIND_VERSION="${KIND_VERSION:-0.17.0}"
+    export KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-quay.io/kubevirtci/kindest-node:v1.23.13@sha256:ef453bb7c79f0e3caba88d2067d4196f427794086a7d0df8df4f019d5e336b61}"
     export KUBECTL_PATH="${KUBECTL_PATH:-/bin/kubectl}"
 }
 
@@ -29,9 +25,9 @@ function print_sriov_data() {
         if [[ ! "$node" =~ .*"control-plane".* ]]; then
             echo "Node: $node"
             echo "VFs:"
-            docker exec $node bash -c "ls -l /sys/class/net/*/device/virtfn*"
+            ${CRI_BIN} exec $node bash -c "ls -l /sys/class/net/*/device/virtfn*"
             echo "PFs PCI Addresses:"
-            docker exec $node bash -c "grep PCI_SLOT_NAME /sys/class/net/*/device/uevent"
+            ${CRI_BIN} exec $node bash -c "grep PCI_SLOT_NAME /sys/class/net/*/device/uevent"
         fi
     done
 }
@@ -51,7 +47,7 @@ function configure_registry_proxy() {
 function up() {
     # print hardware info for easier debugging based on logs
     echo 'Available NICs'
-    docker run --rm --cap-add=SYS_RAWIO quay.io/phoracek/lspci@sha256:0f3cacf7098202ef284308c64e3fc0ba441871a846022bb87d65ff130c79adb1 sh -c "lspci | egrep -i 'network|ethernet'"
+    ${CRI_BIN} run --rm --cap-add=SYS_RAWIO quay.io/phoracek/lspci@sha256:0f3cacf7098202ef284308c64e3fc0ba441871a846022bb87d65ff130c79adb1 sh -c "lspci | egrep -i 'network|ethernet'"
     echo ""
 
     cp $KIND_MANIFESTS_DIR/kind.yaml ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/kind.yaml

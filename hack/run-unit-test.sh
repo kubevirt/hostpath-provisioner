@@ -24,7 +24,6 @@ if [[ -v PROW_JOB_ID ]] ; then
   chown prow:prow -R /home/prow
   echo "Run go test -v in $PWD"
   sudo -i -u prow /bin/bash -c 'cd /home/prow/go/src/github.com/kubevirt/hostpath-provisioner && /usr/local/go/bin/go test -v ./cmd/... ./controller/... ./pkg/...'
-  go get -u golang.org/x/lint/golint
 else
   echo "Run go test -v in $PWD"
   # Run test
