@@ -23,7 +23,6 @@ import (
 	"time"
 
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -129,15 +128,15 @@ func runChangeOnSaTest(saName string, k8sClient *kubernetes.Clientset) {
 	sa, err := k8sClient.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), saName, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
-	sa.Secrets = []corev1.ObjectReference{}
+	sa.OwnerReferences = []metav1.OwnerReference{}
 	_, err = k8sClient.CoreV1().ServiceAccounts(namespace).Update(context.TODO(), sa, metav1.UpdateOptions{})
 	Expect(err).ToNot(HaveOccurred())
 
-	// Assure secrets get repopulated
-	Eventually(func() []corev1.ObjectReference {
+	// Assure owner references get repopulated
+	Eventually(func() []metav1.OwnerReference {
 		sa, err := k8sClient.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), saName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
-		return sa.Secrets
+		return sa.OwnerReferences
 	}, 2*time.Minute, 1*time.Second).ShouldNot(BeEmpty())
 }
 
@@ -161,21 +160,25 @@ func TestReconcileChangeOnServiceAccount(t *testing.T) {
 	defer tearDown(t)
 
 	t.Run("legacy provisioner sa modify", func(t *testing.T) {
+		RegisterTestingT(t)
 		if isLegacyHPPAvailable() {
 			runChangeOnSaTest(legacySa, k8sClient)
 		}
 	})
 	t.Run("legacy provisioner sa delete", func(t *testing.T) {
+		RegisterTestingT(t)
 		if isLegacyHPPAvailable() {
 			runDeleteSaTest(legacySa, k8sClient)
 		}
 	})
 	t.Run("csi driver sa modify", func(t *testing.T) {
+		RegisterTestingT(t)
 		if isCSIStorageClass(k8sClient) {
 			runChangeOnSaTest(csiSa, k8sClient)
 		}
 	})
 	t.Run("csi driver sa delete", func(t *testing.T) {
+		RegisterTestingT(t)
 		if isCSIStorageClass(k8sClient) {
 			runDeleteSaTest(csiSa, k8sClient)
 		}
