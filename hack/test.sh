@@ -16,7 +16,7 @@
 set -e
 readonly ARTIFACTS_PATH="${ARTIFACTS}"
 export KUBEVIRT_NUM_NODES=2
-export KUBEVIRT_PROVIDER=k8s-1.23
+export KUBEVIRT_PROVIDER=k8s-1.25
 export KUBEVIRT_DEPLOY_PROMETHEUS=true
 make cluster-down
 make cluster-up

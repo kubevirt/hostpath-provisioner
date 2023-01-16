@@ -43,8 +43,6 @@ metadata:
   name: hostpath-provisioner
 spec:
   imagePullPolicy: Always
-  imageRegistry: quay.io/kubevirt
-  imageTag: $UPGRADE_FROM
   pathConfig:
     path: "/var/hpvolumes"
     useNamingPrefix: false

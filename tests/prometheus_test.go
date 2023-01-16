@@ -36,6 +36,7 @@ import (
 	hostpathprovisionerv1 "kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1"
 	hostpathprovisioner "kubevirt.io/hostpath-provisioner-operator/pkg/client/clientset/versioned"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	extclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -283,14 +284,29 @@ func getPrometheusSaToken(k8sClient *kubernetes.Clientset) (string, error) {
 			secretName = secret.Name
 		}
 	}
-	secret, err := k8sClient.CoreV1().Secrets(monitoringNs).Get(context.TODO(), secretName, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+	if secretName == "" {
+		// Since 1.24 SAs don't have tokens automatically generated, we determined the SA has no secret, so we
+		// need to generate one.
+		token, err := k8sClient.CoreV1().ServiceAccounts(monitoringNs).CreateToken(
+			context.TODO(),
+			prometheusSaName,
+			&authenticationv1.TokenRequest{
+				Spec: authenticationv1.TokenRequestSpec{},
+			},
+			metav1.CreateOptions{},
+		)
+		Expect(err).ToNot(HaveOccurred())
+		return token.Name, nil
+	} else {
+		secret, err := k8sClient.CoreV1().Secrets(monitoringNs).Get(context.TODO(), secretName, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+		if _, ok := secret.Data["token"]; !ok {
+			return "", fmt.Errorf("No token data in secret")
+		}
+		return string(secret.Data["token"]), nil
 	}
-	if _, ok := secret.Data["token"]; !ok {
-		return "", fmt.Errorf("No token data in secret")
-	}
-	return string(secret.Data["token"]), nil
 }
 
 func scaleOperatorDown(k8sClient *kubernetes.Clientset) error {
@@ -314,7 +330,7 @@ func scaleOperator(k8sClient *kubernetes.Clientset, count *int32) error {
 		return err
 	}
 	Eventually(func() int32 {
-		deployment, _ := k8sClient.AppsV1().Deployments(namespace).Get(context.TODO(), operatorDeploymentName, metav1.GetOptions{})
+		deployment, _ = k8sClient.AppsV1().Deployments(namespace).Get(context.TODO(), operatorDeploymentName, metav1.GetOptions{})
 		return deployment.Status.AvailableReplicas
 	}, 1*time.Minute, time.Second).Should(Equal(*count))
 
