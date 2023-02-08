@@ -14,7 +14,6 @@
 #See the License for the specific language governing permissions and
 #limitations under the License.
 
-KUBEVIRT_PROVIDER=k8s-1.25
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 source "${script_dir}"/common.sh
 setGoInProw $GOLANG_VER
