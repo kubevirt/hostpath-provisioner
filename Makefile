@@ -95,7 +95,7 @@ test:
 	hack/language.sh
 
 test-functional:
-	gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -kubeconfig="../_ci-configs/$(KUBEVIRT_PROVIDER)/.kubeconfig"
+	hack/run-functional-test.sh
 
 test-sanity:
 	hack/sanity.sh
