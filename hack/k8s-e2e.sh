@@ -17,7 +17,6 @@ source ./cluster-up/hack/common.sh
 source ./cluster-up/cluster/${KUBEVIRT_PROVIDER}/provider.sh
 
 export KUBEVIRT_NUM_NODES=2
-export KUBEVIRT_PROVIDER=k8s-1.25
 make cluster-down
 make cluster-up
 
@@ -87,8 +86,10 @@ export KUBE_SSH_KEY_PATH=./vagrant.key
 export KUBE_SSH_USER=vagrant
 
 echo "KUBE_SSH_USER=${KUBE_SSH_USER}, KEY_FILE=${KUBE_SSH_KEY_PATH}"
+k8s_version=$(_kubectl version -o json | jq ".serverVersion.gitVersion" -r)
+echo "Downloading test for version $k8s_version"
 #Download test
-curl --location https://dl.k8s.io/v1.25.0/kubernetes-test-linux-amd64.tar.gz |   tar --strip-components=3 -zxf - kubernetes/test/bin/e2e.test kubernetes/test/bin/ginkgo
+curl --location https://dl.k8s.io/${k8s_version}/kubernetes-test-linux-amd64.tar.gz |   tar --strip-components=3 -zxf - kubernetes/test/bin/e2e.test kubernetes/test/bin/ginkgo
 #Run test
 # Some of these tests assume immediate binding, which is a random node, however if multiple volumes are involved sometimes they end up on different nodes and the test fails. Excluding that test.
 ./e2e.test -ginkgo.v -ginkgo.focus='External.Storage.*kubevirt.io.hostpath-provisioner' -ginkgo.skip='immediate binding|External.Storage.*should access to two volumes with the same volume mode and retain data across pod recreation on the same node \[LinuxOnly\]' -storage.testdriver=./hack/test-driver.yaml -provider=local
