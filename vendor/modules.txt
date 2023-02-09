@@ -144,7 +144,7 @@ github.com/onsi/ginkgo/reporters/stenographer
 github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable
 github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty
 github.com/onsi/ginkgo/types
-# github.com/onsi/gomega v1.24.1 => github.com/onsi/gomega v1.10.1
+# github.com/onsi/gomega v1.24.2 => github.com/onsi/gomega v1.10.1
 ## explicit
 github.com/onsi/gomega
 github.com/onsi/gomega/format
@@ -781,14 +781,12 @@ k8s.io/utils/net
 k8s.io/utils/pointer
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
-# kubevirt.io/hostpath-provisioner-operator v0.14.0
-## explicit; go 1.18
+# kubevirt.io/hostpath-provisioner-operator v0.15.0
+## explicit; go 1.19
 kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner
-kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1alpha1
 kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1
 kubevirt.io/hostpath-provisioner-operator/pkg/client/clientset/versioned
 kubevirt.io/hostpath-provisioner-operator/pkg/client/clientset/versioned/scheme
-kubevirt.io/hostpath-provisioner-operator/pkg/client/clientset/versioned/typed/hostpathprovisioner/v1alpha1
 kubevirt.io/hostpath-provisioner-operator/pkg/client/clientset/versioned/typed/hostpathprovisioner/v1beta1
 # sigs.k8s.io/controller-runtime v0.14.4
 ## explicit; go 1.19
