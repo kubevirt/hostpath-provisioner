@@ -25,13 +25,11 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
-	hostpathprovisionerv1alpha1 "kubevirt.io/hostpath-provisioner-operator/pkg/client/clientset/versioned/typed/hostpathprovisioner/v1alpha1"
 	hostpathprovisionerv1beta1 "kubevirt.io/hostpath-provisioner-operator/pkg/client/clientset/versioned/typed/hostpathprovisioner/v1beta1"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	HostpathprovisionerV1alpha1() hostpathprovisionerv1alpha1.HostpathprovisionerV1alpha1Interface
 	HostpathprovisionerV1beta1() hostpathprovisionerv1beta1.HostpathprovisionerV1beta1Interface
 }
 
@@ -39,13 +37,7 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	hostpathprovisionerV1alpha1 *hostpathprovisionerv1alpha1.HostpathprovisionerV1alpha1Client
-	hostpathprovisionerV1beta1  *hostpathprovisionerv1beta1.HostpathprovisionerV1beta1Client
-}
-
-// HostpathprovisionerV1alpha1 retrieves the HostpathprovisionerV1alpha1Client
-func (c *Clientset) HostpathprovisionerV1alpha1() hostpathprovisionerv1alpha1.HostpathprovisionerV1alpha1Interface {
-	return c.hostpathprovisionerV1alpha1
+	hostpathprovisionerV1beta1 *hostpathprovisionerv1beta1.HostpathprovisionerV1beta1Client
 }
 
 // HostpathprovisionerV1beta1 retrieves the HostpathprovisionerV1beta1Client
@@ -97,10 +89,6 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 
 	var cs Clientset
 	var err error
-	cs.hostpathprovisionerV1alpha1, err = hostpathprovisionerv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
-	if err != nil {
-		return nil, err
-	}
 	cs.hostpathprovisionerV1beta1, err = hostpathprovisionerv1beta1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -126,7 +114,6 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.hostpathprovisionerV1alpha1 = hostpathprovisionerv1alpha1.New(c)
 	cs.hostpathprovisionerV1beta1 = hostpathprovisionerv1beta1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
