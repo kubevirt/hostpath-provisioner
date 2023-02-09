@@ -16,6 +16,8 @@ GOLANG_VER=${GOLANG_VER:-1.19.4}
 
 function setGoInProw() {
   if [[ -v PROW_JOB_ID ]] ; then
+    export GIMME_HOSTARCH=amd64
+    export GIMME_ARCH=${GOARCH}
     eval $(gimme ${1})
     cp -R ~/.gimme/versions/go${1}.linux.amd64 /usr/local/go
   fi
