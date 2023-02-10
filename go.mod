@@ -6,7 +6,7 @@ require (
 	github.com/container-storage-interface/spec v1.7.0
 	github.com/coreos/prometheus-operator v0.38.1-0.20200424145508-7e176fda06cc
 	github.com/golang/protobuf v1.5.2
-	github.com/kubernetes-csi/csi-lib-utils v0.12.0
+	github.com/kubernetes-csi/csi-lib-utils v0.13.0
 	github.com/kubernetes-csi/csi-test/v4 v4.4.0
 	github.com/onsi/gomega v1.24.2
 	github.com/prometheus/client_golang v1.14.0
