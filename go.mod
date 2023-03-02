@@ -23,7 +23,7 @@ require (
 	k8s.io/kubernetes v1.26.1
 	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448
 	kubevirt.io/hostpath-provisioner-operator v0.15.0
-	sigs.k8s.io/controller-runtime v0.14.4
+	sigs.k8s.io/controller-runtime v0.14.5
 	sigs.k8s.io/sig-storage-lib-external-provisioner/v6 v6.3.0
 )
 
