@@ -1,4 +1,5 @@
-FROM registry.fedoraproject.org/fedora-minimal:34
+FROM registry.fedoraproject.org/fedora-minimal:37
+RUN microdnf install glibc -y
 COPY _out/hostpath-csi-driver /
 ENTRYPOINT ["/hostpath-csi-driver"]
 
