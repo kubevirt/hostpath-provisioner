@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -168,7 +168,7 @@ func TestPVCSize(t *testing.T) {
 	dfString, err := RunNodeSSHCommand("node01", "df -Bk /var/hpvolumes | sed 1d")
 	Expect(err).ToNot(HaveOccurred())
 	Expect(dfString).ToNot(BeEmpty())
-	sizeQuantity := resource.MustParse(strings.ToLower(strings.Fields(dfString)[1]))
+	sizeQuantity := resource.MustParse(strings.Fields(dfString)[1] + "i")
 	int64Size, _ := sizeQuantity.AsInt64()
 	hostQuantity := resource.NewQuantity(int64(roundDownCapacityPretty(int64Size)), resource.BinarySI)
 	t.Logf("Reported size on host: %s", hostQuantity.String())
