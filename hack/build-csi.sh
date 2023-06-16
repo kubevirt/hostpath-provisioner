@@ -18,4 +18,4 @@ script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 source "${script_dir}"/common.sh
 setGoInProw $GOLANG_VER
 
-CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o _out/hostpath-csi-driver cmd/plugin/plugin.go
+CGO_ENABLED=1 go build -a -tags strictfipsruntime -ldflags '-extldflags' -o _out/hostpath-csi-driver cmd/plugin/plugin.go
