@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,11 +31,12 @@ import (
 )
 
 const (
-	csiStorageClassName = "hostpath-csi"
-	legacyStorageClassName = "hostpath-provisioner"
+	csiStorageClassName             = "hostpath-csi"
+	legacyStorageClassName          = "hostpath-provisioner"
 	legacyStorageClassNameImmediate = "hostpath-provisioner-immediate"
-	testMountName = "testmount"
+	testMountName                   = "testmount"
 )
+
 func TestCreatePVCOnNode1(t *testing.T) {
 	RegisterTestingT(t)
 	tearDown, ns, k8sClient := setupTestCaseNs(t)
@@ -252,7 +253,7 @@ func TestFsGroup(t *testing.T) {
 	Eventually(func() string {
 		getPod, err = k8sClient.CoreV1().Pods(ns.Name).Get(context.TODO(), getPod.Name, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
-		out ,err := RunKubeCtlCommand("logs", getPod.GetName(), "-n", ns.Name)
+		out, err := RunKubeCtlCommand("logs", getPod.GetName(), "-n", ns.Name)
 		if err != nil {
 			return ""
 		}
@@ -264,8 +265,8 @@ func createPVCDef(namespace, storageClassName string, annotations map[string]str
 	return &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test-pvc",
-			Namespace:   namespace,
-			Annotations: annotations,
+			Namespace:    namespace,
+			Annotations:  annotations,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{
@@ -301,7 +302,7 @@ func createPodUsingPVCWithCommand(namespace, name string, pvc *corev1.Persistent
 					Command: []string{"/bin/sh", "-c", command},
 					VolumeMounts: []v1.VolumeMount{
 						{
-							Name: testMountName,
+							Name:      testMountName,
 							MountPath: "/data",
 						},
 					},
@@ -325,9 +326,9 @@ func createPodUsingPVCWithFsGroup(namespace, name string, pvc *corev1.Persistent
 	userId := int64(1000)
 	pod := createPodUsingPVCWithCommand(namespace, name, pvc, command, annotations)
 	pod.Spec.SecurityContext = &corev1.PodSecurityContext{
-		RunAsUser: &userId,
+		RunAsUser:  &userId,
 		RunAsGroup: &groupId,
-		FSGroup: &groupId,
+		FSGroup:    &groupId,
 	}
 	return pod
 }
