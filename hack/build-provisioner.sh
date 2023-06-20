@@ -16,5 +16,5 @@
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 source "${script_dir}"/common.sh
 setGoInProw $GOLANG_VER
-
+go mod vendor
 CGO_ENABLED=1 go build -a -tags strictfipsruntime -ldflags '-extldflags' -o _out/hostpath-provisioner cmd/provisioner/hostpath-provisioner.go
