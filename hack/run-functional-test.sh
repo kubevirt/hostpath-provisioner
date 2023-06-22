@@ -20,4 +20,5 @@ setGoInProw $GOLANG_VER
 
 echo "** $KUBEVIRT_PROVIDER **"
 go version
+./cluster-up/kubectl.sh get pods -n hostpath-provisioner
 gotestsum --format short-verbose --junitfile ${ARTIFACTS_PATH}/junit.functest.xml -- ./tests/... -kubeconfig="$PWD/_ci-configs/${KUBEVIRT_PROVIDER}/.kubeconfig"
