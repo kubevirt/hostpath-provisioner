@@ -18,9 +18,6 @@ function setGoInProw() {
   if [[ -v PROW_JOB_ID ]] ; then
     export GIMME_HOSTARCH=amd64
     export GIMME_ARCH=${GOARCH}
-    if [ "${GOARCH}" == "arm64" ]; then
-        dnf install -y gcc-aarch64-linux-gnu
-    fi
     eval $(gimme ${1})
     echo "~/.gimme/versions/go${1}.linux.${GOARCH}"
     cp -R ~/.gimme/versions/go${1}.linux.${GOARCH} /usr/local/go
