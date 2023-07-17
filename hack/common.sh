@@ -21,6 +21,7 @@ function setGoInProw() {
     if [ "${GOARCH}" == "arm64" ]; then
         dnf install -y gcc-aarch64-linux-gnu
     fi
+    dnf install -y gcc gcc-c++ kernel-devel
     eval $(gimme ${1})
     cp -R ~/.gimme/versions/go${1}.linux.amd64 /usr/local/go
   fi
