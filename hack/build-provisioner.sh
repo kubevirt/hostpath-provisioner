@@ -16,5 +16,10 @@
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 source "${script_dir}"/common.sh
 setGoInProw $GOLANG_VER
-
-CGO_ENABLED=1 go build -a -tags strictfipsruntime -o _out/hostpath-provisioner cmd/provisioner/hostpath-provisioner.go
+if [ "${GOARCH}" != "amd64" ]; then
+  #disable dynamic linking for non amd64 architectures. Don't have a proper cross compiler to make this
+  #work. In particular can't find a glibc that can be installed.
+  CGO_ENABLED=0 go build -a -o _out/hostpath-provisioner cmd/provisioner/hostpath-provisioner.go
+else
+  CGO_ENABLED=1 go build -a -tags strictfipsruntime -o _out/hostpath-provisioner cmd/provisioner/hostpath-provisioner.go
+fi
