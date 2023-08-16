@@ -54,6 +54,7 @@ const (
 	promRuleOperatorUp       = "1"
 	promRuleOperatorDown     = "0"
 	promRuleCRReady          = "1"
+	promRuleCRNotReady       = "0"
 	operatorDeploymentName   = "hostpath-provisioner-operator"
 )
 
@@ -118,14 +119,22 @@ func TestPrometheusMetrics(t *testing.T) {
 func TestPrometheusAlerts(t *testing.T) {
 	k8sClient, hppClient, token := prometheusTestSetup(t)
 
-	hpp, err := hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Get(context.Background(), "hostpath-provisioner", metav1.GetOptions{})
-	Expect(err).ToNot(HaveOccurred())
-	hpp.ResourceVersion = ""
-	hpp.UID = ""
-	hpp.Status = hostpathprovisionerv1.HostPathProvisionerStatus{}
+	getHPP := func() *hostpathprovisionerv1.HostPathProvisioner {
+		hpp, err := hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Get(context.Background(), "hostpath-provisioner", metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		return hpp
+	}
+
+	updateHPP := func(hpp *hostpathprovisionerv1.HostPathProvisioner) {
+		_, err := hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Update(context.Background(), hpp, metav1.UpdateOptions{})
+		Expect(err).ToNot(HaveOccurred())
+	}
+
+	hpp := getHPP()
+	oldSpec := hpp.Spec.DeepCopy()
 
 	t.Run("HPPOperatorDown", func(t *testing.T) {
-		err = scaleOperatorDown(k8sClient)
+		err := scaleOperatorDown(k8sClient)
 		Expect(err).ToNot(HaveOccurred())
 
 		testPrometheusAlert("HPPOperatorDown", token, t)
@@ -135,29 +144,24 @@ func TestPrometheusAlerts(t *testing.T) {
 	})
 
 	t.Run("HPPNotReady", func(t *testing.T) {
-		oldNodeSelector := hpp.Spec.Workload.NodeSelector
 		hpp.Spec.Workload.NodeSelector = map[string]string{"non-existing": "label"}
+		updateHPP(hpp)
 
-		err = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Delete(context.Background(), "hostpath-provisioner", metav1.DeleteOptions{})
-		Expect(err).ToNot(HaveOccurred())
-
-		Eventually(func() error {
-			_, err = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Create(context.Background(), hpp, metav1.CreateOptions{})
-			return err
-		}, 1*time.Minute, 5*time.Second).ShouldNot(HaveOccurred())
+		testPrometheusRule(token, hppCRReadyQueryName, promRuleCRNotReady)
 
 		testPrometheusAlert("HPPNotReady", token, t)
 
-		hpp.Spec.Workload.NodeSelector = oldNodeSelector
-		_ = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Delete(context.Background(), "hostpath-provisioner", metav1.DeleteOptions{})
-		Eventually(func() error {
-			_, err = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Create(context.Background(), hpp, metav1.CreateOptions{})
-			return err
-		}, 1*time.Minute, 5*time.Second).ShouldNot(HaveOccurred())
+		hpp := getHPP()
+		hpp.Spec = *oldSpec
+		updateHPP(hpp)
+
+		testPrometheusRule(token, hppCRReadyQueryName, promRuleCRReady)
 	})
 
 	_ = scaleOperatorUp(k8sClient)
-	_, _ = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Create(context.Background(), hpp, metav1.CreateOptions{})
+	hpp = getHPP()
+	hpp.Spec = *oldSpec
+	updateHPP(hpp)
 }
 
 func prometheusTestSetup(t *testing.T) (*kubernetes.Clientset, *hostpathprovisioner.Clientset, string) {
