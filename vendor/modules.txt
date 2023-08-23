@@ -144,7 +144,7 @@ github.com/onsi/ginkgo/reporters/stenographer
 github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable
 github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty
 github.com/onsi/ginkgo/types
-# github.com/onsi/gomega v1.27.6 => github.com/onsi/gomega v1.10.1
+# github.com/onsi/gomega v1.27.10 => github.com/onsi/gomega v1.10.1
 ## explicit
 github.com/onsi/gomega
 github.com/onsi/gomega/format
@@ -723,7 +723,7 @@ k8s.io/client-go/util/flowcontrol
 k8s.io/client-go/util/homedir
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/workqueue
-# k8s.io/component-base v0.26.1 => k8s.io/component-base v0.26.1
+# k8s.io/component-base v0.26.7 => k8s.io/component-base v0.26.1
 ## explicit; go 1.19
 k8s.io/component-base/config
 k8s.io/component-base/config/v1alpha1
@@ -780,7 +780,7 @@ k8s.io/utils/net
 k8s.io/utils/pointer
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
-# kubevirt.io/hostpath-provisioner-operator v0.16.0
+# kubevirt.io/hostpath-provisioner-operator v0.17.0
 ## explicit; go 1.19
 kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner
 kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1
