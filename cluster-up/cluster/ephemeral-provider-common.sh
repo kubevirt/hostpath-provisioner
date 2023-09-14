@@ -101,8 +101,22 @@ function _add_common_params() {
 
     if [ -n "${KUBEVIRTCI_PROVISION_CHECK}" ]; then
         params=" --container-registry=quay.io --container-suffix=:latest $params"
-    elif [[ ${KUBEVIRT_SLIM} == "true" ]]; then
-        params=" --slim $params"
+    else
+        if [[ -n ${KUBEVIRTCI_CONTAINER_REGISTRY} ]]; then
+            params=" --container-registry=$KUBEVIRTCI_CONTAINER_REGISTRY $params"
+        fi
+
+        if [[ -n ${KUBEVIRTCI_CONTAINER_ORG} ]]; then
+            params=" --container-org=$KUBEVIRTCI_CONTAINER_ORG $params"
+        fi
+
+        if [[ -n ${KUBEVIRTCI_CONTAINER_SUFFIX} ]]; then
+            params=" --container-suffix=:$KUBEVIRTCI_CONTAINER_SUFFIX $params"
+        fi
+
+        if [[ ${KUBEVIRT_SLIM} == "true" ]]; then
+            params=" --slim $params"
+        fi
     fi
 
     if [ $KUBEVIRT_WITH_ETC_IN_MEMORY == "true" ]; then
@@ -118,6 +132,14 @@ function _add_common_params() {
 
     if [ $KUBEVIRT_PSA == "true" ]; then
         params=" --enable-psa $params"
+    fi
+
+    if [ $KUBEVIRT_SINGLE_STACK == "true" ]; then
+        params=" --single-stack $params"
+    fi
+
+    if [ $KUBEVIRT_ENABLE_AUDIT == "true" ]; then
+        params=" --enable-audit $params"
     fi
 
     if [ $KUBEVIRT_DEPLOY_NFS_CSI == "true" ]; then

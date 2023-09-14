@@ -20,7 +20,7 @@ export KUBEVIRT_DEPLOY_PROMETHEUS=true
 make cluster-down
 make cluster-up
 if [[ -v PROW_JOB_ID ]] ; then
-  GOLANG_VER=${GOLANG_VER:-1.20.5}
+  GOLANG_VER=${GOLANG_VER:-1.20.8}
   eval $(gimme ${GOLANG_VER})
   cp -R ~/.gimme/versions/go${GOLANG_VER}.linux.amd64 /usr/local/go
 fi
