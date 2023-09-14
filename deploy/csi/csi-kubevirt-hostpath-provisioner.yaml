@@ -84,6 +84,7 @@ spec:
         - --endpoint=$(CSI_ENDPOINT)
         - --nodeid=$(NODE_NAME)
         - --version=$(VERSION)
+        - --datadir=[{"name":"legacy","path":"/csi-data-dir"}]
         env:
         - name: CSI_ENDPOINT
           value: unix:///csi/csi.sock
