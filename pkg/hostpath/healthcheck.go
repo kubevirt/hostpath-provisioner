@@ -72,7 +72,7 @@ func checkMountPointExist(volumePath string) (bool, error) {
 }
 
 func getPVStats(volumePath string) (available int64, capacity int64, used int64, inodes int64, inodesFree int64, inodesUsed int64, err error) {
-	return fs.Info(volumePath)
+	return fs.FsInfo(volumePath)
 }
 
 func checkPVUsage(volumePath string) (int64, int64, error) {

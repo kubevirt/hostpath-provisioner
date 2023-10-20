@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -234,7 +234,7 @@ func roundDownCapacityPretty(capacityBytes int64) int64 {
 }
 
 func isCSIStorageClass(k8sClient *kubernetes.Clientset) bool {
-	sc, err := k8sClient.StorageV1().StorageClasses().Get(context.TODO(), csiStorageClassName, metav1.GetOptions{})
+	sc, err := k8sClient.StorageV1().StorageClasses().Get(context.TODO(), tests.csiStorageClassName, metav1.GetOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(sc.Name).To(gomega.Equal(csiStorageClassName))
 	return sc.Provisioner == csiProvisionerName
