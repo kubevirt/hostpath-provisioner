@@ -33,8 +33,7 @@ type Interface interface {
 	HostpathprovisionerV1beta1() hostpathprovisionerv1beta1.HostpathprovisionerV1beta1Interface
 }
 
-// Clientset contains the clients for groups. Each group has exactly one
-// version included in a Clientset.
+// Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
 	hostpathprovisionerV1beta1 *hostpathprovisionerv1beta1.HostpathprovisionerV1beta1Client

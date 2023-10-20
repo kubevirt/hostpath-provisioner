@@ -234,7 +234,7 @@ func roundDownCapacityPretty(capacityBytes int64) int64 {
 }
 
 func isCSIStorageClass(k8sClient *kubernetes.Clientset) bool {
-	sc, err := k8sClient.StorageV1().StorageClasses().Get(context.TODO(), tests.csiStorageClassName, metav1.GetOptions{})
+	sc, err := k8sClient.StorageV1().StorageClasses().Get(context.TODO(), csiStorageClassName, metav1.GetOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(sc.Name).To(gomega.Equal(csiStorageClassName))
 	return sc.Provisioner == csiProvisionerName
