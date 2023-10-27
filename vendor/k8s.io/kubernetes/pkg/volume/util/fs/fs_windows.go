@@ -1,4 +1,3 @@
-//go:build windows
 // +build windows
 
 /*
@@ -20,12 +19,13 @@ limitations under the License.
 package fs
 
 import (
-	"os"
-	"path/filepath"
+	"fmt"
 	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var (
@@ -33,22 +33,12 @@ var (
 	procGetDiskFreeSpaceEx = modkernel32.NewProc("GetDiskFreeSpaceExW")
 )
 
-type UsageInfo struct {
-	Bytes  int64
-	Inodes int64
-}
-
-// Info returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
+// FSInfo returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
 // for the filesystem that path resides upon.
-func Info(path string) (int64, int64, int64, int64, int64, int64, error) {
+func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	var freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes int64
 	var err error
 
-	// The equivalent linux call supports calls against files but the syscall for windows
-	// fails for files with error code: The directory name is invalid. (#99173)
-	// https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
-	// By always ensuring the directory path we meet all uses cases of this function
-	path = filepath.Dir(path)
 	ret, _, err := syscall.Syscall6(
 		procGetDiskFreeSpaceEx.Addr(),
 		4,
@@ -67,51 +57,21 @@ func Info(path string) (int64, int64, int64, int64, int64, int64, error) {
 }
 
 // DiskUsage gets disk usage of specified path.
-func DiskUsage(path string) (UsageInfo, error) {
-	var usage UsageInfo
-	info, err := os.Lstat(path)
+func DiskUsage(path string) (*resource.Quantity, error) {
+	_, _, usage, _, _, _, err := FsInfo(path)
 	if err != nil {
-		return usage, err
+		return nil, err
 	}
 
-	usage.Bytes, err = diskUsage(path, info)
-	return usage, err
+	used, err := resource.ParseQuantity(fmt.Sprintf("%d", usage))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse fs usage %d due to %v", usage, err)
+	}
+	used.Format = resource.BinarySI
+	return &used, nil
 }
 
-func diskUsage(currPath string, info os.FileInfo) (int64, error) {
-	var size int64
-
-	if info.Mode()&os.ModeSymlink != 0 {
-		return size, nil
-	}
-
-	size += info.Size()
-
-	if !info.IsDir() {
-		return size, nil
-	}
-
-	dir, err := os.Open(currPath)
-	if err != nil {
-		return size, err
-	}
-	defer dir.Close()
-
-	files, err := dir.Readdir(-1)
-	if err != nil {
-		return size, err
-	}
-
-	for _, file := range files {
-		if file.IsDir() {
-			s, err := diskUsage(filepath.Join(currPath, file.Name()), file)
-			if err != nil {
-				return size, err
-			}
-			size += s
-		} else {
-			size += file.Size()
-		}
-	}
-	return size, nil
+// Always return zero since inodes is not supported on Windows.
+func Find(path string) (int64, error) {
+	return 0, nil
 }

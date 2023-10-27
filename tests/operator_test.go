@@ -438,7 +438,6 @@ func TestNodeSelector(t *testing.T) {
 		}
 		return true
 	}, 90*time.Second, 1*time.Second).Should(BeTrue())
-
 }
 
 func verifyCsiDriver(k8sClient *kubernetes.Clientset) *storagev1.CSIDriver {

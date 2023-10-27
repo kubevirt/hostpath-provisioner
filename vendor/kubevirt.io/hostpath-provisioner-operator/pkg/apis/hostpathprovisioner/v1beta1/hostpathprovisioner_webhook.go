@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 const (
@@ -39,47 +40,47 @@ func (r *HostPathProvisioner) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Validator = &HostPathProvisioner{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *HostPathProvisioner) ValidateCreate() error {
+func (r *HostPathProvisioner) ValidateCreate() (admission.Warnings, error) {
 	return r.validatePathConfigAndStoragePools()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *HostPathProvisioner) ValidateUpdate(_ runtime.Object) error {
+func (r *HostPathProvisioner) ValidateUpdate(_ runtime.Object) (admission.Warnings, error) {
 	return r.validatePathConfigAndStoragePools()
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *HostPathProvisioner) ValidateDelete() error {
-	return nil
+func (r *HostPathProvisioner) ValidateDelete() (admission.Warnings, error) {
+	return nil, nil
 }
 
-func (r *HostPathProvisioner) validatePathConfigAndStoragePools() error {
+func (r *HostPathProvisioner) validatePathConfigAndStoragePools() (admission.Warnings, error) {
 	if r.Spec.PathConfig != nil && len(r.Spec.StoragePools) > 0 {
-		return fmt.Errorf("pathConfig and storage pools cannot be both set")
+		return nil, fmt.Errorf("pathConfig and storage pools cannot be both set")
 	} else if r.Spec.PathConfig == nil && len(r.Spec.StoragePools) == 0 {
-		return fmt.Errorf("either pathConfig or storage pools must be set")
+		return nil, fmt.Errorf("either pathConfig or storage pools must be set")
 	}
 	if r.Spec.PathConfig != nil && len(r.Spec.PathConfig.Path) == 0 {
-		return fmt.Errorf("pathconfig path must be set")
+		return nil, fmt.Errorf("pathconfig path must be set")
 	}
 	usedPaths := make(map[string]int, 0)
 	usedNames := make(map[string]int, 0)
 	for i, source := range r.Spec.StoragePools {
 		if err := validateStoragePool(source); err != nil {
-			return err
+			return nil, err
 		}
 		if index, ok := usedPaths[source.Path]; !ok {
 			usedPaths[source.Path] = i
 		} else {
-			return fmt.Errorf("spec.storagePools[%d].path is the same as spec.storagePools[%d].path, cannot have duplicate paths", i, index)
+			return nil, fmt.Errorf("spec.storagePools[%d].path is the same as spec.storagePools[%d].path, cannot have duplicate paths", i, index)
 		}
 		if index, ok := usedNames[source.Name]; !ok {
 			usedNames[source.Name] = i
 		} else {
-			return fmt.Errorf("spec.storagePools[%d].name is the same as spec.storagePools[%d].name, cannot have duplicate names", i, index)
+			return nil, fmt.Errorf("spec.storagePools[%d].name is the same as spec.storagePools[%d].name, cannot have duplicate names", i, index)
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 func validateStoragePool(storagePool StoragePool) error {
