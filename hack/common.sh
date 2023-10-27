@@ -19,7 +19,6 @@ function setGoInProw() {
     export GIMME_HOSTARCH=amd64
     export GIMME_ARCH=${GOARCH}
     eval $(gimme ${1})
-    echo "~/.gimme/versions/go${1}.linux.${GOARCH}"
-    cp -R ~/.gimme/versions/go${1}.linux.${GOARCH} /usr/local/go
+    cp -R ~/.gimme/versions/go${1}.linux.amd64 /usr/local/go
   fi
 }
