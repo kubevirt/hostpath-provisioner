@@ -11,8 +11,8 @@ require (
 	github.com/onsi/gomega v1.18.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
-	golang.org/x/sys v0.0.0-20220209214540-3681064d5158
+	golang.org/x/net v0.17.0
+	golang.org/x/sys v0.13.0
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 	google.golang.org/grpc v1.40.0
 	k8s.io/api v0.24.0
