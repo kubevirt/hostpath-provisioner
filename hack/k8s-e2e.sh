@@ -33,7 +33,7 @@ fi
 if ! command -v sshuttle &> /dev/null
 then
   #Setup sshutle
-  dnf install -y sshuttle
+  dnf install -y sshuttle --refresh
 
   docker_id=($(docker ps | grep vm | awk '{print $1}'))
   echo "docker node: [${docker_id[0]}]"
