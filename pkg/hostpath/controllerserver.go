@@ -39,7 +39,7 @@ type hostPathController struct {
 }
 
 func NewHostPathController(config *Config) *hostPathController {
-	return &hostPathController {
+	return &hostPathController{
 		cfg: config,
 	}
 }
@@ -119,7 +119,7 @@ func (hpc *hostPathController) CreateVolume(ctx context.Context, req *csi.Create
 			return nil, fmt.Errorf("failed to create volume %v: %w", req.GetName(), err)
 		}
 		klog.V(4).Infof("created volume %s at path %s", req.GetName(), filepath.Join(hpc.cfg.StoragePoolDataDir[storagePoolName], req.GetName()))
-	}	
+	}
 
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
@@ -317,7 +317,7 @@ func (hpc *hostPathController) ListVolumes(ctx context.Context, req *csi.ListVol
 				},
 			})
 		}
-		if end < volumesLength - 1 {
+		if end < volumesLength-1 {
 			volumeRes.NextToken = filepath.Base(volumeDirs[end])
 		}
 	} else {
@@ -389,6 +389,11 @@ func (hpc *hostPathController) ListSnapshots(ctx context.Context, req *csi.ListS
 
 func (hpc *hostPathController) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "controllerExpandVolume is not supported")
+}
+
+// ControllerModifyVolume implements csi.ControllerServer.
+func (*hostPathController) ControllerModifyVolume(context.Context, *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "controllerModifyVolume is not supported")
 }
 
 func (hpc *hostPathController) getControllerServiceCapabilities() []*csi.ControllerServiceCapability {
