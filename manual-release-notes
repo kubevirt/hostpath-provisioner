@@ -1,0 +1,7 @@
+v1.15.0
+- Release
+
+v1.15.1
+- Updated gRPC to 1.56.3
+- Updated golang to 1.17
+
