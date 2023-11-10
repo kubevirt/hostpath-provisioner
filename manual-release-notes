@@ -1,2 +1,6 @@
-0.17.0:
+v0.17.0:
 Updated dependencies
+
+v0.17.1:
+- Update google.golang.org/grpc to 1.56.3
+- Update golang.org/x/net to 0.17.0 
