@@ -1,0 +1,7 @@
+v0.14.0
+- Initial release
+
+v0.14.1
+- Update google.golang.org/grpc to 1.56.3 (#286)
+- Update golang/x/net to 0.17.0
+- Allow dynamic linking of binaries
