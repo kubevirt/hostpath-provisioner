@@ -61,3 +61,39 @@ $ sudo chcon -t container_file_t -R /var/hpvolumes
 
 ### Systemd
 If you are running worker nodes that are running systemd, we have provided a [service file](deploy/systemd/hostpath-provisioner.service) that you can install in /etc/systemd/system/hostpath-provisioner.service to have it set the SElinux labeling at start-up
+
+### Create a Cluster & Launch HPP
+1. Install the requirements
+```bash
+#Enable dynamically linked builds:
+$ sudo dnf -y install gcc
+```
+```bash
+#Enable OCI builds:
+$ sudo dnf -y install buildah
+```
+2. Navigate to the project's directory
+```bash
+$ cd <path>/hostpath-provisioner
+```
+3. Remove an old cluster
+```bash
+$ make cluster-down
+```
+4. Create a new cluster
+```bash
+$ make cluster-up
+```
+5. Clean previous HPP deployment and re-deploy HPP \
+   (When making a change, execute only this command - no need to repeat steps 1-3)
+```bash
+$ make cluster-sync
+```
+
+### Command-Line Tool
+Use `./cluster-up/kubectl.sh` as the command-line tool.
+
+For example:
+```bash
+$ ./cluster-up/kubectl.sh get pods --all-namespaces
+```
