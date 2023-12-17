@@ -7,7 +7,7 @@ github.com/cespare/xxhash/v2
 # github.com/container-storage-interface/spec v1.9.0
 ## explicit; go 1.18
 github.com/container-storage-interface/spec/lib/go/csi
-# github.com/davecgh/go-spew v1.1.1
+# github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
 # github.com/emicklei/go-restful/v3 v3.11.0
@@ -89,6 +89,14 @@ github.com/kubernetes-csi/csi-lib-utils/protosanitizer
 ## explicit; go 1.16
 github.com/kubernetes-csi/csi-test/v4/pkg/sanity
 github.com/kubernetes-csi/csi-test/v4/utils
+# github.com/kubevirt/monitoring/pkg/metrics/parser v0.0.0-20230710120526-cc1644c90b64
+## explicit; go 1.20
+github.com/kubevirt/monitoring/pkg/metrics/parser
+# github.com/machadovilaca/operator-observability v0.0.8
+## explicit; go 1.20
+github.com/machadovilaca/operator-observability/pkg/docs
+github.com/machadovilaca/operator-observability/pkg/operatormetrics
+github.com/machadovilaca/operator-observability/pkg/operatorrules
 # github.com/mailru/easyjson v0.7.7
 ## explicit; go 1.12
 github.com/mailru/easyjson/buffer
