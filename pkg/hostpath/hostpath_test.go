@@ -26,10 +26,10 @@ import (
 	"testing"
 	"time"
 
-	io_prometheus_client "github.com/prometheus/client_model/go"
-
 	. "github.com/onsi/gomega"
 	"k8s.io/utils/mount"
+
+	"kubevirt.io/hostpath-provisioner/pkg/monitoring/metrics"
 )
 
 const (
@@ -117,9 +117,7 @@ func Test_NewHostPathDriver(t *testing.T) {
 		_, err = os.Stat(filepath.Join(tempDir, "testdatadir"))
 		Expect(err).ToNot(HaveOccurred())
 		time.Sleep(1 * time.Second)
-		dto := &io_prometheus_client.Metric{}
-		poolPathSharedWithOsGauge.Write(dto)
-		Expect(dto.Gauge.GetValue()).To(BeEquivalentTo(0))
+		Expect(int(metrics.GetPoolPathSharedWithOs())).To(BeEquivalentTo(0))
 
 		// Now switch the socket dir, so we are indeed sharing path with OS (we call NewHostPathDriver with tmpfs backed folder)
 		csiSocketDir = "/tmp"
@@ -131,8 +129,6 @@ func Test_NewHostPathDriver(t *testing.T) {
 		_, err = os.Stat(filepath.Join(tempDir, "testdatadir"))
 		Expect(err).ToNot(HaveOccurred())
 		time.Sleep(1 * time.Second)
-		dto = &io_prometheus_client.Metric{}
-		poolPathSharedWithOsGauge.Write(dto)
-		Expect(dto.Gauge.GetValue()).To(BeEquivalentTo(1))
+		Expect(int(metrics.GetPoolPathSharedWithOs())).To(BeEquivalentTo(1))
 	})
 }

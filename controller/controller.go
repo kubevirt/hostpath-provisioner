@@ -20,16 +20,11 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"net"
-	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/time/rate"
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -51,7 +46,6 @@ import (
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/workqueue"
 	glog "k8s.io/klog/v2"
-	"kubevirt.io/hostpath-provisioner/controller/metrics"
 	"sigs.k8s.io/sig-storage-lib-external-provisioner/v6/util"
 )
 
@@ -777,25 +771,6 @@ func (ctrl *ProvisionController) Run(_ <-chan struct{}) {
 		ctrl.hasRunLock.Lock()
 		ctrl.hasRun = true
 		ctrl.hasRunLock.Unlock()
-		if ctrl.metricsPort > 0 {
-			prometheus.MustRegister([]prometheus.Collector{
-				metrics.PersistentVolumeClaimProvisionTotal,
-				metrics.PersistentVolumeClaimProvisionFailedTotal,
-				metrics.PersistentVolumeClaimProvisionDurationSeconds,
-				metrics.PersistentVolumeDeleteTotal,
-				metrics.PersistentVolumeDeleteFailedTotal,
-				metrics.PersistentVolumeDeleteDurationSeconds,
-			}...)
-			http.Handle(ctrl.metricsPath, promhttp.Handler())
-			address := net.JoinHostPort(ctrl.metricsAddress, strconv.FormatInt(int64(ctrl.metricsPort), 10))
-			glog.Infof("Starting metrics server at %s\n", address)
-			go wait.Forever(func() {
-				err := http.ListenAndServe(address, nil)
-				if err != nil {
-					glog.Errorf("Failed to listen on %s: %v", address, err)
-				}
-			}, 5*time.Second)
-		}
 
 		// If a external SharedInformer has been passed in, this controller
 		// should not call Run again
@@ -1022,12 +997,9 @@ func (ctrl *ProvisionController) syncClaim(obj interface{}) (ProvisioningState, 
 	if err != nil {
 		return ProvisioningFinished, err
 	} else if should {
-		startTime := time.Now()
-
 		var status ProvisioningState
 		var err error
 		status, err = ctrl.provisionClaimOperation(claim)
-		ctrl.updateProvisionStats(claim, err, startTime)
 		return status, err
 	}
 	return ProvisioningFinished, nil
@@ -1041,9 +1013,7 @@ func (ctrl *ProvisionController) syncVolume(obj interface{}) error {
 	}
 
 	if ctrl.shouldDelete(volume) {
-		startTime := time.Now()
 		err := ctrl.deleteVolumeOperation(volume)
-		ctrl.updateDeleteStats(volume, err, startTime)
 		return err
 	}
 	return nil
@@ -1163,29 +1133,6 @@ func (ctrl *ProvisionController) checkFinalizer(volume *v1.PersistentVolume, fin
 		}
 	}
 	return false
-}
-
-func (ctrl *ProvisionController) updateProvisionStats(claim *v1.PersistentVolumeClaim, err error, startTime time.Time) {
-	class := ""
-	if claim.Spec.StorageClassName != nil {
-		class = *claim.Spec.StorageClassName
-	}
-	if err != nil {
-		metrics.PersistentVolumeClaimProvisionFailedTotal.WithLabelValues(class).Inc()
-	} else {
-		metrics.PersistentVolumeClaimProvisionDurationSeconds.WithLabelValues(class).Observe(time.Since(startTime).Seconds())
-		metrics.PersistentVolumeClaimProvisionTotal.WithLabelValues(class).Inc()
-	}
-}
-
-func (ctrl *ProvisionController) updateDeleteStats(volume *v1.PersistentVolume, err error, startTime time.Time) {
-	class := volume.Spec.StorageClassName
-	if err != nil {
-		metrics.PersistentVolumeDeleteFailedTotal.WithLabelValues(class).Inc()
-	} else {
-		metrics.PersistentVolumeDeleteDurationSeconds.WithLabelValues(class).Observe(time.Since(startTime).Seconds())
-		metrics.PersistentVolumeDeleteTotal.WithLabelValues(class).Inc()
-	}
 }
 
 // provisionClaimOperation attempts to provision a volume for the given claim.

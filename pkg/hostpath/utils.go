@@ -25,9 +25,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/klog/v2"
+
+	"kubevirt.io/hostpath-provisioner/pkg/monitoring/metrics"
 )
 
 const (
@@ -37,11 +38,6 @@ const (
 )
 
 var (
-	poolPathSharedWithOsGauge = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "kubevirt_hpp_pool_path_shared_with_os",
-			Help: "HPP pool path sharing a filesystem with OS, fix to prevent HPP PVs from causing disk pressure and affecting node operation",
-		})
 	csiSocketDir = "/csi"
 )
 
@@ -143,11 +139,12 @@ func getVolumeDirectories(storagePoolDataDirs map[string]string) ([]string, erro
 
 // RunPrometheusServer runs a prometheus server for metrics
 func RunPrometheusServer(metricsAddr string) {
-	reg := prometheus.NewRegistry()
-	reg.MustRegister(poolPathSharedWithOsGauge)
-	handler := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
+	err := metrics.SetupMetrics()
+	if err != nil {
+		klog.Error(err, "Failed to Setup Prometheus metrics")
+	}
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", handler)
+	mux.Handle("/metrics", promhttp.Handler())
 	server := http.Server{
 		Addr:    metricsAddr,
 		Handler: mux,
@@ -222,8 +219,8 @@ func evaluateSharedPathMetric(storagePoolDataDir map[string]string) {
 		}
 	}
 	if pathShared {
-		poolPathSharedWithOsGauge.Set(1)
+		metrics.SetPoolPathSharedWithOs(1)
 	} else {
-		poolPathSharedWithOsGauge.Set(0)
+		metrics.SetPoolPathSharedWithOs(0)
 	}
 }

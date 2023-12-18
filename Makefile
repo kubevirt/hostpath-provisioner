@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: cluster-up cluster-down cluster-sync cluster-clean
+.PHONY: cluster-up cluster-down cluster-sync cluster-clean generate-doc
 
 KUBEVIRT_PROVIDER?=k8s-1.27
 HPP_IMAGE?=hostpath-provisioner
@@ -97,5 +97,14 @@ test:
 test-functional:
 	hack/run-functional-test.sh
 
-test-sanity:
+test-sanity: generate-doc lint-metrics
 	hack/sanity.sh
+
+generate-doc: build-docgen
+	_out/metricsdocs > docs/metrics.md
+
+build-docgen:
+	go build -ldflags="${LDFLAGS}" -o _out/metricsdocs ./tools/metricsdocs
+
+lint-metrics:
+	hack/prom_metric_linter.sh --operator-name="kubevirt" --sub-operator-name="hpp"
