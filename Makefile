@@ -104,7 +104,7 @@ generate-doc: build-docgen
 	_out/metricsdocs > docs/metrics.md
 
 build-docgen:
-	go build -ldflags="${LDFLAGS}" -o _out/metricsdocs ./tools/metricsdocs
+	go build -ldflags="${LDFLAGS}" -o _out/metricsdocs ./pkg/monitoring/tools/metricsdocs
 
 lint-metrics:
 	hack/prom_metric_linter.sh --operator-name="kubevirt" --sub-operator-name="hpp"
