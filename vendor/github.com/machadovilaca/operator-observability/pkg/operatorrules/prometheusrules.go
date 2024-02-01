@@ -68,6 +68,8 @@ func buildRecordingRulesRules() []promv1.Rule {
 
 func buildAlertsRules() []promv1.Rule {
 	var rules []promv1.Rule
-	rules = append(rules, operatorRegistry.registeredAlerts...)
+	for _, rule := range operatorRegistry.registeredAlerts {
+		rules = append(rules, rule)
+	}
 	return rules
 }
