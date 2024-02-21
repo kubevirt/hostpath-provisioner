@@ -7,11 +7,11 @@ image:
   tag: "latest"
 
 kubevirt:
-  # path where the volume should be mounted
+  # path to the volume on the host
   volumePath: /media/kubevirt-hpp
   # change to '"true"', to have the name of the pvc be part of the directory
   namePrefix: '"false"'
-  # add a nodeSelector to the volume mount
+  # add a nodeSelector to the volume
   nodeSelector: {}
     # nodeSelector:
     #   - name: xxxxxx
@@ -27,8 +27,7 @@ serviceAccount:
   automount: true
   # Annotations to add to the service account
   annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
+  # The name of the service account to use
   name: "kubevirt-hostpath-provisioner-admin"
 
 rbac:

@@ -21,10 +21,10 @@ helm install kubevirt-hostpath-provisioner /path/to/kubevirt-hostpath-provisione
 | image.repository | string | `"quay.io/kubevirt/hostpath-provisioner"` |  |
 | image.tag | string | `"latest"` |  |
 | imagePullSecrets | list | `[]` |  |
-| kubevirt.namePrefix | string | `"\"false\""` |  |
-| kubevirt.nodeSelector | object | `{}` |  |
-| kubevirt.reclaimPolicy | string | `"Delete"` |  |
-| kubevirt.volumePath | string | `"/media/kubevirt-hpp"` |  |
+| kubevirt.namePrefix | string | `"\"false\""` | change to '"true"', to have the name of the pvc be part of the directory |
+| kubevirt.nodeSelector | object | `{}` | add a nodeSelector to the volume |
+| kubevirt.reclaimPolicy | string | `"Delete"` | reclaimpolicy for pv |
+| kubevirt.volumePath | string | `"/media/kubevirt-hpp"` | path to the volume on the host |
 | nodeSelector | object | `{}` |  |
 | podAnnotations | object | `{}` |  |
 | podLabels | object | `{}` |  |
@@ -35,7 +35,7 @@ helm install kubevirt-hostpath-provisioner /path/to/kubevirt-hostpath-provisione
 | serviceAccount.annotations | object | `{}` |  |
 | serviceAccount.automount | bool | `true` |  |
 | serviceAccount.create | bool | `true` |  |
-| serviceAccount.name | string | `"kubevirt-hostpath-provisioner-admin"` |  |
+| serviceAccount.name | string | `"kubevirt-hostpath-provisioner-admin"` | The name of the service account to use |
 | tolerations | list | `[]` |  |
 | volumeMounts | list | `[]` |  |
 | volumes | list | `[]` |  |
