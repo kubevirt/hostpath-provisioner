@@ -16,14 +16,17 @@
 set -e
 
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
-source "${script_dir}"/common.sh
-setGoInProw $GOLANG_VER
 
 if [[ -v PROW_JOB_ID ]] ; then
+  type go
   useradd prow -s /bin/bash
   chown prow:prow -R /home/prow
   echo "Run go test -v in $PWD"
-  sudo -i -u prow /bin/bash -c 'cd /home/prow/go/src/github.com/kubevirt/hostpath-provisioner && /usr/local/go/bin/go test -v ./cmd/... ./controller/... ./pkg/...'
+  mkdir -p /tmp/goroot
+  cp -R $GOROOT /tmp/goroot
+  mv /tmp/goroot/go* /tmp/goroot/go
+  ls -al /tmp/goroot
+  sudo -i -u prow /bin/bash -c 'cd /home/prow/go/src/github.com/kubevirt/hostpath-provisioner && /tmp/goroot/go/bin/go test -v ./cmd/... ./controller/... ./pkg/...'
 else
   echo "Run go test -v in $PWD"
   # Run test

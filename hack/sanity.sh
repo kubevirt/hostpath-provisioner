@@ -15,8 +15,6 @@
 set -e
 DOCKER_REPO=${DOCKER_REPO:-registry:5000}
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
-source "${script_dir}"/common.sh
-setGoInProw $GOLANG_VER
 
 echo "docker repo: [$DOCKER_REPO]"
 CGO_ENABLED=0 go test -o _out/sanity.test -c -v ./sanity/...

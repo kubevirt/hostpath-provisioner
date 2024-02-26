@@ -15,8 +15,6 @@
 #limitations under the License.
 
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
-source "${script_dir}"/common.sh
-setGoInProw $GOLANG_VER
 
 echo "** $KUBEVIRT_PROVIDER **"
 go version
