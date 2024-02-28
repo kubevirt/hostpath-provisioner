@@ -19,11 +19,6 @@ export KUBEVIRT_NUM_NODES=2
 export KUBEVIRT_DEPLOY_PROMETHEUS=true
 make cluster-down
 make cluster-up
-if [[ -v PROW_JOB_ID ]] ; then
-  GOLANG_VER=${GOLANG_VER:-1.20.10}
-  eval $(gimme ${GOLANG_VER})
-  cp -R ~/.gimme/versions/go${GOLANG_VER}.linux.amd64 /usr/local/go
-fi
 
 go install gotest.tools/gotestsum@latest
 #export UPGRADE_FROM=$(curl -s https://github.com/kubevirt/hostpath-provisioner-operator/releases/latest | grep -o "v[0-9]\.[0-9]*\.[0-9]*")
