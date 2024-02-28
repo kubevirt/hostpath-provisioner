@@ -32,9 +32,6 @@ done
 go build -o _out/prom-metrics-collector "$METRICS_COLLECTOR_PATH/..."
 json_output=$(_out/prom-metrics-collector 2>/dev/null)
 
-# Select container runtime
-source hack/common.sh
-
 # Run the linter by using the prom-metrics-linter Docker container
 errors=$($OCI_BIN run --rm -i "quay.io/kubevirt/prom-metrics-linter:$linter_image_tag" \
     --metric-families="$json_output" \
@@ -46,3 +43,4 @@ if [[ $errors != "" ]]; then
   echo "$errors"
   exit 1
 fi
+
