@@ -20,13 +20,11 @@ HPP_CSI_IMAGE?=hostpath-csi-driver
 TAG?=latest
 DOCKER_REPO?=quay.io/kubevirt
 ARTIFACTS_PATH?=_out
-GOLANG_VER?=1.20.10
 GOOS?=linux
 GOARCH?=amd64
 BUILDAH_PLATFORM_FLAG?=--platform $(GOOS)/$(GOARCH)
 OCI_BIN ?= $(shell if podman ps >/dev/null 2>&1; then echo podman; elif docker ps >/dev/null 2>&1; then echo docker; fi)
 
-export GOLANG_VER
 export KUBEVIRT_PROVIDER
 export DOCKER_REPO
 export GOOS
