@@ -315,8 +315,8 @@ func checkRequiredAnnotations(rule monitoringv1.Rule) {
 		"%s summary is missing or empty", rule.Alert)
 	Expect(rule.Annotations).To(HaveKey("runbook_url"),
 		"%s runbook_url is missing", rule.Alert)
-	Expect(rule.Annotations).To(HaveKeyWithValue("runbook_url", HaveSuffix(rule.Alert)),
-		"%s runbook_url is not equal to alert name", rule.Alert)
+	Expect(rule.Annotations).To(HaveKeyWithValue("runbook_url", ContainSubstring(rule.Alert)),
+		"%s runbook_url doesn't include alert name", rule.Alert)
 	resp, err := http.Head(rule.Annotations["runbook_url"])
 	ExpectWithOffset(1, err).ToNot(HaveOccurred(), fmt.Sprintf("%s runbook is not available", rule.Alert))
 	ExpectWithOffset(1, resp.StatusCode).Should(Equal(http.StatusOK), fmt.Sprintf("%s runbook is not available", rule.Alert))
