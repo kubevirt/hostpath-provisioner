@@ -14,9 +14,11 @@ else
 fi
 
 function set_kind_params() {
-    export KIND_VERSION="${KIND_VERSION:-0.18.0}"
-    export KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-kindest/node:v1.27.1@sha256:9915f5629ef4d29f35b478e819249e89cfaffcbfeebda4324e5c01d53d937b09}"
-    export KUBECTL_PATH="${KUBECTL_PATH:-/bin/kubectl}"
+    version=$(cat cluster-up/cluster/$KUBEVIRT_PROVIDER/version)
+    export KIND_VERSION="${KIND_VERSION:-$version}"
+
+    image=$(cat cluster-up/cluster/$KUBEVIRT_PROVIDER/image)
+    export KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-$image}"
 }
 
 function configure_registry_proxy() {
@@ -32,9 +34,6 @@ function configure_registry_proxy() {
 }
 
 function up() {
-    # load the vfio_mdev module
-    /usr/sbin/modprobe vfio_mdev
-    
     # print hardware info for easier debugging based on logs
     echo 'Available cards'
     ${CRI_BIN} run --rm --cap-add=SYS_RAWIO quay.io/phoracek/lspci@sha256:0f3cacf7098202ef284308c64e3fc0ba441871a846022bb87d65ff130c79adb1 sh -c "lspci -k | grep -EA2 'VGA|3D'"
