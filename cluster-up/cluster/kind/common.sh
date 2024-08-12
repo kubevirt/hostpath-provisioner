@@ -171,7 +171,7 @@ function _fix_node_labels() {
     master_nodes=$(_get_nodes | grep -i $MASTER_NODES_PATTERN | awk '{print $1}')
     for node in ${master_nodes[@]}; do
         # removing NoSchedule taint if is there
-        if _kubectl taint nodes $node node-role.kubernetes.io/master:NoSchedule-; then
+        if _kubectl taint nodes $node node-role.kubernetes.io/master:NoSchedule- || _kubectl taint nodes $node node-role.kubernetes.io/control-plane:NoSchedule-; then
             _kubectl label node $node kubevirt.io/schedulable=true
         fi
     done
@@ -187,7 +187,17 @@ function setup_kind() {
     $KIND --loglevel debug create cluster --retain --name=${CLUSTER_NAME} --config=${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/kind.yaml --image=$KIND_NODE_IMAGE
     $KIND get kubeconfig --name=${CLUSTER_NAME} > ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubeconfig
 
-    ${CRI_BIN} cp ${CLUSTER_NAME}-control-plane:$KUBECTL_PATH ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl
+    if ${CRI_BIN} exec ${CLUSTER_NAME}-control-plane ls /usr/bin/kubectl > /dev/null; then
+        kubectl_path=/usr/bin/kubectl
+    elif ${CRI_BIN} exec ${CLUSTER_NAME}-control-plane ls /bin/kubectl > /dev/null; then
+        kubectl_path=/bin/kubectl
+    else
+        echo "Error: kubectl not found on node, exiting"
+        exit 1
+    fi
+
+    ${CRI_BIN} cp ${CLUSTER_NAME}-control-plane:$kubectl_path ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl
+
     chmod u+x ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubectl
 
     if [ $KUBEVIRT_WITH_KIND_ETCD_IN_MEMORY == "true" ]; then
@@ -290,7 +300,7 @@ EOF
 }
 
 function _setup_ipfamily() {
-    if [ $IPFAMILY != "" ]; then
+    if [ "$IPFAMILY" != "" ]; then
         cat <<EOF >> ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/kind.yaml
 networking:
   ipFamily: $IPFAMILY

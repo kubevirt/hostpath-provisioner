@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -322,6 +323,17 @@ func createPodUsingPVCWithCommand(namespace, name string, pvc *corev1.Persistent
 							Name:      testMountName,
 							MountPath: "/data",
 						},
+					},
+					SecurityContext: &corev1.SecurityContext{
+						AllowPrivilegeEscalation: ptr.To[bool](false),
+						Capabilities: &corev1.Capabilities{
+							Drop: []corev1.Capability{"ALL"},
+						},
+						RunAsNonRoot: ptr.To[bool](true),
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+						Privileged: ptr.To[bool](false),
 					},
 				},
 			},
