@@ -93,7 +93,7 @@ test:
 	hack/language.sh
 
 test-functional:
-	hack/run-functional-test.sh
+	ARTIFACTS_PATH=$(ARTIFACTS_PATH) hack/run-functional-test.sh
 
 test-sanity: generate-doc lint-metrics
 	hack/sanity.sh
