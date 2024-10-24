@@ -349,7 +349,7 @@ func getTotalCapacity(path string) (int64, error) {
 	}
 
 	// Capacity is total block count * block size
-	return int64(statfs.Blocks) * statfs.Bsize, nil
+	return int64(statfs.Blocks) * int64(statfs.Bsize), nil
 }
 
 func createPv(identity, nodeName, dirPath string) *v1.PersistentVolume {
