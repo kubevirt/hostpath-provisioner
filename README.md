@@ -33,6 +33,14 @@ Alternatively you can use the [hostpath-provisioner-operator](https://github.com
 
 ### Deployment in OpenShift
 In order to deploy the CSI driver in OpenShift you will need to supply the correct [SecurityContextConstraints](deploy/kubevirt-hostpath-security-constraints-csi.yaml). There is no need to relabel the directory you are creating the volumes in. The CSI driver will take care of that.
+
+### Deployment with Helm
+To deploy the CSI driver with helm open go to helm-chart/kubevirt-hostpath-provisioner/charts in this repository and run the helm install command:
+```bash
+helm install kubevirt-hostpath-provisioner kubevirt-hostpath-provisioner-0.1.0.tgz --namespace kubevirt-hostpath-provisioner
+```
+For more details about the chart check the chart's [README](helm-chart/README.md)
+
 ## Overview legacy provisioner
 
 This is a special version of the kubernetes hostpath provisioner, it's a slightly modified version of the sig storage [example hostpath provisioner](https://github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/tree/master/examples/hostpath-provisioner).
