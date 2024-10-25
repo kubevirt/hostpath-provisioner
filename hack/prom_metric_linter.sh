@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 set -e
 
 linter_image_tag="v0.0.3"
