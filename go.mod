@@ -16,7 +16,7 @@ require (
 	github.com/prometheus/client_model v0.6.1
 	golang.org/x/net v0.39.0
 	golang.org/x/sys v0.32.0
-	golang.org/x/time v0.9.0
+	golang.org/x/time v0.11.0
 	google.golang.org/grpc v1.71.1
 	k8s.io/api v0.28.4
 	k8s.io/apiextensions-apiserver v0.28.4
