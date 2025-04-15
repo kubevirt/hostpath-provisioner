@@ -1,0 +1,31 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "baseBranches": ["main"],
+  "prConcurrentLimit": 3,
+  "lockFileMaintenance": {
+    "enabled": false
+  },
+  "postUpdateOptions": ["gomodTidy"],
+  "labels": ["release-note-none"],
+  "extends": [":gitSignOff", ":dependencyDashboard"],
+  "packageRules": [
+    {
+      "groupName": "all dependencies",
+      "groupSlug": "all",
+      "enabled": false,
+      "matchPackageNames": [
+        "*"
+      ]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true
+  },
+  "osvVulnerabilityAlerts": true,
+  "assigneesFromCodeOwners": true,
+  "separateMajorMinor": true,
+  "ignorePaths": [
+    "**/vendor/**",
+    "**/cluster-up/**"
+  ]
+}
