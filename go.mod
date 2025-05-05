@@ -2,7 +2,7 @@ module kubevirt.io/hostpath-provisioner
 
 go 1.23.0
 
-toolchain go1.24.1
+toolchain go1.23.7
 
 require (
 	github.com/container-storage-interface/spec v1.9.0
