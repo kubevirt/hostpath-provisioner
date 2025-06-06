@@ -18,7 +18,7 @@ require (
 	golang.org/x/net v0.39.0
 	golang.org/x/sys v0.32.0
 	golang.org/x/time v0.9.0
-	google.golang.org/grpc v1.71.1
+	google.golang.org/grpc v1.73.0
 	k8s.io/api v0.28.4
 	k8s.io/apiextensions-apiserver v0.28.4
 	k8s.io/apimachinery v0.30.3
@@ -64,13 +64,13 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/exp v0.0.0-20220827204233-334a2380cb91 // indirect
-	golang.org/x/oauth2 v0.27.0 // indirect
+	golang.org/x/oauth2 v0.28.0 // indirect
 	golang.org/x/term v0.31.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f // indirect
-	google.golang.org/protobuf v1.36.5 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463 // indirect
+	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -88,7 +88,6 @@ replace (
 	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.4.0
 	k8s.io/client-go => k8s.io/client-go v0.28.3
-
 )
 
 replace github.com/spf13/pflag => github.com/spf13/pflag v1.0.5
