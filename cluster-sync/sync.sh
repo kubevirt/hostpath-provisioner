@@ -21,8 +21,8 @@ source ./cluster-up/hack/common.sh
 source ./cluster-up/cluster/${KUBEVIRT_PROVIDER}/provider.sh
 
 for i in $(seq 1 ${KUBEVIRT_NUM_NODES}); do
-    ./cluster-up/ssh.sh "node$(printf "%02d" ${i})" "sudo mkdir -p /var/hpvolumes"
-    ./cluster-up/ssh.sh "node$(printf "%02d" ${i})" "sudo chcon -t container_file_t -R /var/hpvolumes"
+  ./cluster-up/ssh.sh "node$(printf "%02d" ${i})" "sudo mkdir -p /var/hpvolumes"
+  ./cluster-up/ssh.sh "node$(printf "%02d" ${i})" "sudo chcon -t container_file_t -R /var/hpvolumes"
 done
 
 registry=${IMAGE_REGISTRY:-localhost:$(_port registry)}
@@ -52,24 +52,24 @@ EOF
 
   retry_counter=0
   while [[ $retry_counter -lt 10 ]] && [ "$observed_version" != "$UPGRADE_FROM" ]; do
-    observed_version=`_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.observedVersion}{"\n"}'`
-    target_version=`_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.targetVersion}{"\n"}'`
-    operator_version=`_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.operatorVersion}{"\n"}'`
+    observed_version=$(_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.observedVersion}{"\n"}')
+    target_version=$(_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.targetVersion}{"\n"}')
+    operator_version=$(_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.operatorVersion}{"\n"}')
     echo "observedVersion: $observed_version, operatorVersion: $operator_version, targetVersion: $target_version"
     retry_counter=$((retry_counter + 1))
-  sleep 5
+    sleep 5
   done
   if [ $retry_counter -eq 10 ]; then
-	echo "Unable to deploy to version $UPGRADE_FROM"
-	hpp_obj=$(_kubectl get Hostpathprovisioner -o yaml)
-	echo $hpp_obj
-	exit 1
+    echo "Unable to deploy to version $UPGRADE_FROM"
+    hpp_obj=$(_kubectl get Hostpathprovisioner -o yaml)
+    echo $hpp_obj
+    exit 1
   fi
 
 fi
 
 if [ ${HPP_NAMESPACE} == "hostpath-provisioner" ]; then
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/namespace.yaml
+  _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/namespace.yaml
 fi
 _kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.6.1/cert-manager.yaml
 _kubectl wait --for=condition=available -n cert-manager --timeout=120s --all deployments
@@ -107,21 +107,22 @@ volumeBindingMode: Immediate
 EOF
 echo "Waiting for hostpath provisioner to be available"
 _kubectl wait hostpathprovisioners.hostpathprovisioner.kubevirt.io/hostpath-provisioner --for=condition=Available --timeout=480s
+_kubectl apply -f "deploy/tests/network-policies.yaml" -n ${HPP_NAMESPACE}
 
 retry_counter=0
 while [[ $retry_counter -lt 10 ]] && [ "$observed_version" == "$UPGRADE_FROM" ]; do
-  observed_version=`_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.observedVersion}{"\n"}'`
-  target_version=`_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.targetVersion}{"\n"}'`
-  operator_version=`_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.operatorVersion}{"\n"}'`
+  observed_version=$(_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.observedVersion}{"\n"}')
+  target_version=$(_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.targetVersion}{"\n"}')
+  operator_version=$(_kubectl get Hostpathprovisioner -o=jsonpath='{.items[*].status.operatorVersion}{"\n"}')
   echo "observedVersion: $observed_version, operatorVersion: $operator_version, targetVersion: $target_version"
   retry_counter=$((retry_counter + 1))
-sleep 5
+  sleep 5
 done
 if [ $retry_counter -eq 20 ]; then
-echo "Unable to deploy to latest version"
-hpp_obj=$(_kubectl get hostpathprovisioner -o yaml)
-echo $hpp_obj
-exit 1
+  echo "Unable to deploy to latest version"
+  hpp_obj=$(_kubectl get hostpathprovisioner -o yaml)
+  echo $hpp_obj
+  exit 1
 fi
 
 function configure_prometheus {

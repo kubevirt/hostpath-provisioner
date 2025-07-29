@@ -1,0 +1,115 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-hpp
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hpp-allow-operator-egress-to-dns
+spec:
+  podSelector:
+    matchLabels:
+      name: hostpath-provisioner-operator
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: "kube-dns"
+      ports:
+        - protocol: TCP
+        - protocol: UDP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hpp-allow-operands-egress-to-dns
+spec:
+  podSelector:
+    matchLabels:
+      k8s-app: hostpath-provisioner
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: "kube-dns"
+      ports:
+        - protocol: TCP
+        - protocol: UDP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hpp-allow-operator-egress-to-api-server
+spec:
+  podSelector:
+    matchLabels:
+      name: hostpath-provisioner-operator
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 6443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hpp-allow-operands-egress-to-api-server
+spec:
+  podSelector:
+    matchLabels:
+      k8s-app: hostpath-provisioner
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 6443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hpp-allow-ingress-to-operator-webhook-server
+spec:
+  podSelector:
+    matchLabels:
+      name: hostpath-provisioner-operator
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 9443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hpp-allow-ingress-to-metrics
+spec:
+  podSelector:
+    matchLabels:
+      prometheus.hostpathprovisioner.kubevirt.io: "true"
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: 8080
+          protocol: TCP
