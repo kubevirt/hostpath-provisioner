@@ -10,7 +10,7 @@ require (
 	github.com/kubernetes-csi/csi-lib-utils v0.16.0
 	github.com/kubernetes-csi/csi-test/v4 v4.4.0
 	github.com/kubevirt/monitoring/pkg/metrics/parser v0.0.0-20230710120526-cc1644c90b64
-	github.com/machadovilaca/operator-observability v0.0.26
+	github.com/machadovilaca/operator-observability v0.0.27
 	github.com/onsi/gomega v1.31.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.71.2
 	github.com/prometheus/client_golang v1.22.0
@@ -88,7 +88,6 @@ replace (
 	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.4.0
 	k8s.io/client-go => k8s.io/client-go v0.28.3
-
 )
 
 replace github.com/spf13/pflag => github.com/spf13/pflag v1.0.5
