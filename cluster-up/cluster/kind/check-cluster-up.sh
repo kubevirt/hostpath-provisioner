@@ -69,12 +69,17 @@ export CRI_BIN=${CRI_BIN:-$(detect_cri)}
     fi
     ${kubectl} wait -n kubevirt kv kubevirt --for condition=Available --timeout 15m
 
+    if [[ "$KUBEVIRT_PROVIDER" =~ "sriov" ]]; then
+      # Some SR-IOV tests require Kubevirt CPUManager feature
+      ${kubectl} patch kubevirts -n kubevirt kubevirt --type=json -p='[{"op": "replace", "path": "/spec/configuration/developerConfiguration/featureGates","value": ["CPUManager"]}]'
+    fi
+
     echo "Run latest nighly build Kubevirt conformance tests"
     kubevirt_plugin="--plugin ${nightly_build_base_url}/${latest}/conformance.yaml"
     SONOBUOY_EXTRA_ARGS="${SONOBUOY_EXTRA_ARGS} ${kubevirt_plugin}"
 
     commit=$(curl -sL "${nightly_build_base_url}/${latest}/commit")
-    commit="${commit:0:9}"
+    commit="${commit:0:10}"
     container_tag="--plugin-env kubevirt-conformance.CONTAINER_TAG=${latest}_${commit}"
     SONOBUOY_EXTRA_ARGS="${SONOBUOY_EXTRA_ARGS} ${container_tag}"
     

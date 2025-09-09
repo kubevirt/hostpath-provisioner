@@ -45,7 +45,7 @@ else
 fi
 
 _cli_container="${KUBEVIRTCI_GOCLI_CONTAINER:-quay.io/kubevirtci/gocli:${KUBEVIRTCI_TAG}}"
-_cli="${_cri_bin} run --privileged --net=host --rm ${USE_TTY} -v ${_cri_socket}:/var/run/docker.sock"
+_cli="${_cri_bin} run --privileged --net=host --rm ${USE_TTY} -v ${_cri_socket}:/var/run/docker.sock -e KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER}"
 # gocli will try to mount /lib/modules to make it accessible to dnsmasq in
 # in case it exists
 if [ -d /lib/modules ]; then
@@ -114,7 +114,8 @@ function _add_common_params() {
             params=" --container-suffix=:$KUBEVIRTCI_CONTAINER_SUFFIX $params"
         fi
 
-        if [[ ${KUBEVIRT_SLIM} == "true" ]]; then
+        # Currently, the s390x architecture supports only KUBEVIRT_SLIM.
+        if [[ ${KUBEVIRT_SLIM} == "true" || $(uname -m) == "s390x" ]]; then
             params=" --slim $params"
         fi
     fi
@@ -138,12 +139,28 @@ function _add_common_params() {
         params=" --single-stack $params"
     fi
 
+    if [ $KUBEVIRT_FLANNEL == "true" ]; then
+        params=" --flannel $params"
+    fi
+
+    if [ $KUBEVIRT_NO_ETCD_FSYNC == "true" ]; then
+        params=" --no-etcd-fsync $params"
+    fi
+
     if [ $KUBEVIRT_ENABLE_AUDIT == "true" ]; then
         params=" --enable-audit $params"
     fi
 
+    if [ $KUBVIRT_WITH_CNAO_SKIP_CONFIG == "true" ]; then
+        params=" --skip-cnao-cr $params"
+    fi
+
     if [ $KUBEVIRT_DEPLOY_NFS_CSI == "true" ]; then
-        params=" --enable-nfs-csi $params"
+        if [ -z $KUBEVIRT_NFS_DIR ]; then
+            >&2 echo "NFS requested but no NFS directory specified (KUBEVIRT_NFS_DIR)"
+            exit 1
+        fi
+        params=" --enable-nfs-csi --nfs-data $KUBEVIRT_NFS_DIR $params"
     fi
 
     # alternate (new) way to specify storage providers
@@ -180,6 +197,63 @@ function _add_common_params() {
     if [ -n "$KUBEVIRT_FIPS" ]; then
         params=" --enable-fips $params"
     fi
+
+    if [ "$KUBEVIRT_WITH_MULTUS_V3" == "true" ] || [ "$KUBEVIRT_WITH_MULTUS" == "true" ]; then
+        params=" --deploy-multus $params"
+    fi
+
+    if [ "$KUBEVIRT_WITH_CNAO" == "true" ]; then
+        params=" --enable-cnao $params"
+    fi
+
+    if [ "$KUBEVIRT_WITH_DYN_NET_CTRL" == "true" ]; then
+        params=" --deploy-dnc $params"
+    fi
+
+    if [ "$KUBEVIRT_DEPLOY_CDI" == "true" ]; then
+        params=" --deploy-cdi $params"
+    fi
+
+    if [ -n "$KUBEVIRT_CUSTOM_CDI_VERSION" ]; then
+        params=" --cdi-version=$KUBEVIRT_CUSTOM_CDI_VERSION $params"
+    fi
+
+    if [ "$KUBEVIRT_DEPLOY_AAQ" == "true" ]; then
+        params=" --deploy-aaq $params"
+    fi
+
+    if [ -n "$KUBEVIRT_CUSTOM_AAQ_VERSION" ]; then
+        params=" --aaq-version=$KUBEVIRT_CUSTOM_AAQ_VERSION $params"
+    fi
+
+    if [ "$KUBEVIRT_KSM_ON" == "true" ]; then
+        params=" --enable-ksm $params"
+    fi
+
+    if [ ! -z $KUBEVIRT_KSM_SLEEP_BETWEEN_SCANS_MS ]; then
+        params=" --ksm-scan-interval=$KUBEVIRT_KSM_SLEEP_BETWEEN_SCANS_MS $params"
+    fi
+
+    if [ ! -z $KUBEVIRT_KSM_PAGES_TO_SCAN ]; then
+        params=" --ksm-page-count=$KUBEVIRT_KSM_PAGES_TO_SCAN $params"
+    fi
+
+    if [ "$KUBEVIRT_SWAP_ON" == "true" ]; then
+        params=" --enable-swap $params"
+    fi
+
+    if [ ! -z $KUBEVIRT_SWAP_SIZE_IN_GB  ]; then
+        params=" --swap-size=$KUBEVIRT_SWAP_SIZE_IN_GB $params"
+    fi
+
+    if [ ! -z $KUBEVIRT_SWAPPINESS ]; then
+        params=" --swapiness=$KUBEVIRT_SWAPPINESS $params"
+    fi
+
+    if [ $KUBEVIRT_UNLIMITEDSWAP == "true" ]; then
+        params=" --unlimited-swap $params"
+    fi
+
 
     if [ -n "$KUBEVIRTCI_PROXY" ]; then
         params=" --docker-proxy=$KUBEVIRTCI_PROXY $params"

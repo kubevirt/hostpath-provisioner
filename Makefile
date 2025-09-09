@@ -14,7 +14,7 @@
 
 .PHONY: cluster-up cluster-down cluster-sync cluster-clean generate-doc
 
-KUBEVIRT_PROVIDER?=k8s-1.30
+KUBEVIRT_PROVIDER?=k8s-1.32
 HPP_IMAGE?=hostpath-provisioner
 HPP_CSI_IMAGE?=hostpath-csi-driver
 TAG?=latest
