@@ -21,10 +21,10 @@ function print_available_nics() {
 }
 
 function set_kind_params() {
-    version=$(cat cluster-up/cluster/$KUBEVIRT_PROVIDER/version)
+    version=$(cat "${KUBEVIRTCI_PATH}/cluster/$KUBEVIRT_PROVIDER/version")
     export KIND_VERSION="${KIND_VERSION:-$version}"
 
-    image=$(cat cluster-up/cluster/$KUBEVIRT_PROVIDER/image)
+    image=$(cat "${KUBEVIRTCI_PATH}/cluster/$KUBEVIRT_PROVIDER/image")
     export KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-$image}"
 }
 
@@ -62,6 +62,7 @@ function deploy_sriov() {
 function up() {
     cp $KIND_MANIFESTS_DIR/kind.yaml ${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/kind.yaml
     export CONFIG_WORKER_CPU_MANAGER=true
+    export CONFIG_TOPOLOGY_MANAGER_POLICY="single-numa-node"
     kind_up
 
     configure_registry_proxy
