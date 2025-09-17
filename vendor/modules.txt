@@ -90,11 +90,6 @@ github.com/kubernetes-csi/csi-test/v4/utils
 # github.com/kubevirt/monitoring/pkg/metrics/parser v0.0.0-20230710120526-cc1644c90b64
 ## explicit; go 1.20
 github.com/kubevirt/monitoring/pkg/metrics/parser
-# github.com/machadovilaca/operator-observability v0.0.26
-## explicit; go 1.21
-github.com/machadovilaca/operator-observability/pkg/docs
-github.com/machadovilaca/operator-observability/pkg/operatormetrics
-github.com/machadovilaca/operator-observability/pkg/operatorrules
 # github.com/mailru/easyjson v0.7.7
 ## explicit; go 1.12
 github.com/mailru/easyjson/buffer
@@ -184,6 +179,11 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
+# github.com/rhobs/operator-observability-toolkit v0.0.29
+## explicit; go 1.21
+github.com/rhobs/operator-observability-toolkit/pkg/docs
+github.com/rhobs/operator-observability-toolkit/pkg/operatormetrics
+github.com/rhobs/operator-observability-toolkit/pkg/operatorrules
 # github.com/spf13/pflag v1.0.5 => github.com/spf13/pflag v1.0.5
 ## explicit; go 1.12
 github.com/spf13/pflag
