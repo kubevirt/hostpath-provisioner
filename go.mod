@@ -14,7 +14,7 @@ require (
 	github.com/onsi/gomega v1.31.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.71.2
 	github.com/prometheus/client_golang v1.22.0
-	github.com/prometheus/client_model v0.6.1
+	github.com/prometheus/client_model v0.6.2
 	golang.org/x/net v0.41.0
 	golang.org/x/sys v0.33.0
 	golang.org/x/time v0.13.0
