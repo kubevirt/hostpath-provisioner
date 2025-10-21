@@ -10,15 +10,15 @@ require (
 	github.com/kubernetes-csi/csi-lib-utils v0.16.0
 	github.com/kubernetes-csi/csi-test/v4 v4.4.0
 	github.com/kubevirt/monitoring/pkg/metrics/parser v0.0.0-20230710120526-cc1644c90b64
-	github.com/machadovilaca/operator-observability v0.0.27
 	github.com/onsi/gomega v1.31.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.71.2
 	github.com/prometheus/client_golang v1.22.0
-	github.com/prometheus/client_model v0.6.2
-	golang.org/x/net v0.44.0
+	github.com/prometheus/client_model v0.6.1
+	github.com/rhobs/operator-observability-toolkit v0.0.29
+	golang.org/x/net v0.43.0
 	golang.org/x/sys v0.36.0
-	golang.org/x/time v0.13.0
-	google.golang.org/grpc v1.75.1
+	golang.org/x/time v0.9.0
+	google.golang.org/grpc v1.71.1
 	k8s.io/api v0.28.4
 	k8s.io/apiextensions-apiserver v0.28.4
 	k8s.io/apimachinery v0.30.3

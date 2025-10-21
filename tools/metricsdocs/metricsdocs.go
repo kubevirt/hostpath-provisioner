@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/machadovilaca/operator-observability/pkg/docs"
+	"github.com/rhobs/operator-observability-toolkit/pkg/docs"
 
 	"kubevirt.io/hostpath-provisioner/pkg/monitoring/metrics"
 )
