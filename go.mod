@@ -1,8 +1,6 @@
 module kubevirt.io/hostpath-provisioner
 
-go 1.23.0
-
-toolchain go1.23.7
+go 1.24.0
 
 require (
 	github.com/container-storage-interface/spec v1.9.0
@@ -15,8 +13,8 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.71.2
 	github.com/prometheus/client_golang v1.22.0
 	github.com/prometheus/client_model v0.6.1
-	golang.org/x/net v0.39.0
-	golang.org/x/sys v0.32.0
+	golang.org/x/net v0.47.0
+	golang.org/x/sys v0.38.0
 	golang.org/x/time v0.9.0
 	google.golang.org/grpc v1.71.1
 	k8s.io/api v0.28.4
@@ -62,11 +60,11 @@ require (
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/crypto v0.37.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/exp v0.0.0-20220827204233-334a2380cb91 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
-	golang.org/x/term v0.31.0 // indirect
-	golang.org/x/text v0.24.0 // indirect
+	golang.org/x/term v0.37.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f // indirect
@@ -88,7 +86,6 @@ replace (
 	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.4.0
 	k8s.io/client-go => k8s.io/client-go v0.28.3
-
 )
 
 replace github.com/spf13/pflag => github.com/spf13/pflag v1.0.5
