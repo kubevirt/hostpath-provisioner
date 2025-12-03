@@ -15,8 +15,8 @@ require (
 	github.com/prometheus/client_golang v1.22.0
 	github.com/prometheus/client_model v0.6.1
 	github.com/rhobs/operator-observability-toolkit v0.0.29
-	golang.org/x/net v0.43.0
-	golang.org/x/sys v0.36.0
+	golang.org/x/net v0.47.0
+	golang.org/x/sys v0.38.0
 	golang.org/x/time v0.9.0
 	google.golang.org/grpc v1.76.0
 	k8s.io/api v0.28.4
@@ -62,11 +62,11 @@ require (
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/crypto v0.42.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/exp v0.0.0-20220827204233-334a2380cb91 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/term v0.35.0 // indirect
-	golang.org/x/text v0.29.0 // indirect
+	golang.org/x/term v0.37.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250804133106-a7a43d27e69b // indirect
