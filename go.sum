@@ -270,8 +270,8 @@ github.com/prometheus/procfs v0.0.2/go.mod h1:TjEm7ze935MbeOT/UhFTIMYKhuLP4wbCsT
 github.com/prometheus/procfs v0.0.8/go.mod h1:7Qr8sr6344vo1JqZ6HhLceV9o3AJ1Ff+GxbHq6oeK9A=
 github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0learggepc=
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
-github.com/rhobs/operator-observability-toolkit v0.0.29 h1:C6Z+Qk8OCgHwnIYg7eVfqAkgFy6vFQiYdo2K1r6FZF0=
-github.com/rhobs/operator-observability-toolkit v0.0.29/go.mod h1:a6bL5LZGNVA32pGsfMY74HYgfftQL7/90BD7rCCf1lI=
+github.com/rhobs/operator-observability-toolkit v0.0.30 h1:VvlEXRfmvZq8Nzgz0ECJk2WvjqNiVlYPKT11f+hKvjA=
+github.com/rhobs/operator-observability-toolkit v0.0.30/go.mod h1:a6bL5LZGNVA32pGsfMY74HYgfftQL7/90BD7rCCf1lI=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
 github.com/rogpeppe/go-internal v1.10.0 h1:TMyTOH3F/DB16zRVcYyreMH6GnZZrwQVAoYjRBZyWFQ=
