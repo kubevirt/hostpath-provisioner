@@ -1,7 +1,8 @@
 # Hostpath Provisioner Metrics
 
-### kubevirt_hpp_pool_path_shared_with_os
-HPP pool path sharing a filesystem with OS, fix to prevent HPP PVs from causing disk pressure and affecting node operation. Type: Gauge.
+| Name | Kind | Type | Description |
+|------|------|------|-------------|
+| kubevirt_hpp_pool_path_shared_with_os | Metric | Gauge | HPP pool path sharing a filesystem with OS, fix to prevent HPP PVs from causing disk pressure and affecting node operation |
 
 ## Developing new metrics
 
