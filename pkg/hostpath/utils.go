@@ -60,6 +60,7 @@ type StoragePoolInfo struct {
 	Path             string                `json:"path"`
 	SnapshotPath     *string               `json:"snapshotPath,omitempty"`
 	SnapshotProvider *SnapshotProviderType `json:"snapshotProvider,omitempty"`
+	Shared           bool                  `json:"shared"`
 }
 
 // roundDownCapacityPretty Round down the capacity to an easy to read value. Blatantly stolen from here: https://github.com/kubernetes-incubator/external-storage/blob/master/local-volume/provisioner/pkg/discovery/discovery.go#L339

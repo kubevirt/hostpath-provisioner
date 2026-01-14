@@ -56,9 +56,8 @@ func NewHostPathController(config *Config) *hostPathController {
 				nodeName:   config.NodeID,
 				sourcePath: storagePoolInfo.Path,
 			}
-			// case KopiaProvider:
-			// 	snapshotProviders[storagePool] = &Kopia{
-			// 	},
+		default:
+			klog.Fatalf("Unsupported snapshot provider %s for storage pool %s", *storagePoolInfo.SnapshotProvider, storagePool)
 		}
 	}
 	return &hostPathController{
@@ -133,7 +132,11 @@ func (hpc *hostPathController) CreateVolume(ctx context.Context, req *csi.Create
 		return nil, err
 	}
 	topologies := []*csi.Topology{}
-	topologies = append(topologies, &csi.Topology{Segments: map[string]string{TopologyKeyNode: hpc.cfg.NodeID}})
+
+	// if the storage pool pvc is RWO, apply node affinity.
+	if !hpc.cfg.StoragePoolInfo[storagePoolName].Shared {
+		topologies = append(topologies, &csi.Topology{Segments: map[string]string{TopologyKeyNode: hpc.cfg.NodeID}})
+	}
 
 	if exists, err := checkPathExist(filepath.Join(hpc.cfg.StoragePoolInfo[storagePoolName].Path, req.GetName())); err != nil {
 		return nil, err
