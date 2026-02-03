@@ -874,22 +874,22 @@ func Test_ValidateCreateSnapshotRequest(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 	defer os.RemoveAll(tempDir)
 	controller := createControllerServer(tempDir)
-	t.Run("missing request", func(t *testing.T) {
+	t.Run("missing snapshot request", func(t *testing.T) {
 		err := controller.validateCreateSnapshotRequest(nil)
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(BeEquivalentTo(status.Error(codes.InvalidArgument, "missing request")))
+		Expect(err).To(BeEquivalentTo(status.Error(codes.InvalidArgument, "missing snapshot request")))
 	})
-	t.Run("missing name", func(t *testing.T) {
+	t.Run("missing snapshot name", func(t *testing.T) {
 		err := controller.validateCreateSnapshotRequest(&csi.CreateSnapshotRequest{})
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(BeEquivalentTo(status.Error(codes.InvalidArgument, "name missing in request")))
+		Expect(err).To(BeEquivalentTo(status.Error(codes.InvalidArgument, "name missing in snapshot request")))
 	})
 	t.Run("volumeid", func(t *testing.T) {
 		err := controller.validateCreateSnapshotRequest(&csi.CreateSnapshotRequest{
 			Name: validSnapshotName,
 		})
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(BeEquivalentTo(status.Error(codes.InvalidArgument, "source volume id missing in request")))
+		Expect(err).To(BeEquivalentTo(status.Error(codes.InvalidArgument, "source volume id missing in snapshot request")))
 	})
 	t.Run("successful", func(t *testing.T) {
 		err := controller.validateCreateSnapshotRequest(&csi.CreateSnapshotRequest{
@@ -903,10 +903,10 @@ func Test_ValidateCreateSnapshotRequest(t *testing.T) {
 func Test_CreateSnapshotCheckPathError(t *testing.T) {
 	RegisterTestingT(t)
 	controller := createControllerServer("")
-	t.Run("missing request", func(t *testing.T) {
+	t.Run("missing snapshot request", func(t *testing.T) {
 		_, err := controller.CreateSnapshot(context.TODO(), nil)
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(BeEquivalentTo(status.Error(codes.InvalidArgument, "missing request")))
+		Expect(err).To(BeEquivalentTo(status.Error(codes.InvalidArgument, "missing snapshot request")))
 	})
 	oldcheckPathExistFunc := checkPathExist
 	defer func() {

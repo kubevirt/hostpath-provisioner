@@ -250,9 +250,11 @@ func evaluateSharedPathMetric(storagePoolDataDir map[string]StoragePoolInfo) {
 			pathShared = true
 			klog.V(1).Infof("pool (%s, %s), shares path with OS which can lead to node disk pressure", k, v.Path)
 		}
-		if checkVolumePathSharedWithOS(*v.SnapshotPath) {
-			pathShared = true
-			klog.V(1).Infof("pool (%s, %s), shares path with OS which can lead to node disk pressure", k, *v.SnapshotPath)
+		if v.SnapshotPath != nil {
+			if checkVolumePathSharedWithOS(*v.SnapshotPath) {
+				pathShared = true
+				klog.V(1).Infof("pool (%s, %s), shares path with OS which can lead to node disk pressure", k, *v.SnapshotPath)
+			}
 		}
 	}
 	if pathShared {

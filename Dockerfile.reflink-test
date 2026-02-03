@@ -1,0 +1,13 @@
+FROM fedora:latest
+
+RUN dnf install -y \
+    golang \
+    xfsprogs \
+    btrfs-progs \
+    e2fsprogs \
+    util-linux
+
+WORKDIR /test/pkg/hostpath
+
+# podman build -f Dockerfile.reflink-test -t reflink-test .
+# podman run --privileged -v $(pwd):/test reflink-test go test -v -run "TestReflink_ReflinkCopy"
