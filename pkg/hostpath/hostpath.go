@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,7 +40,7 @@ type Config struct {
 	DriverName             string
 	Endpoint               string
 	NodeID                 string
-	StoragePoolDataDir     map[string]string
+	StoragePoolInfo        map[string]StoragePoolInfo
 	DefaultStoragePoolName string
 	Version                string
 	Mounter                mount.Interface
@@ -71,33 +71,38 @@ func NewHostPathDriver(ctx context.Context, cfg *Config, dataDir string) (*hostP
 	if cfg.Mounter == nil {
 		cfg.Mounter = mount.New("")
 	}
-	cfg.StoragePoolDataDir = make(map[string]string)
 
 	storagePools := make([]StoragePoolInfo, 0)
 	if err := json.Unmarshal([]byte(dataDir), &storagePools); err != nil {
 		return nil, errors.New("unable to parse storage pool info")
 	}
+	cfg.StoragePoolInfo = make(map[string]StoragePoolInfo)
 	for _, storagePool := range storagePools {
 		if len(cfg.DefaultStoragePoolName) == 0 {
 			cfg.DefaultStoragePoolName = storagePool.Name
 		}
-		cfg.StoragePoolDataDir[storagePool.Name] = storagePool.Path
+		cfg.StoragePoolInfo[storagePool.Name] = storagePool
 	}
 
-	for k, v := range cfg.StoragePoolDataDir {
-		klog.V(1).Infof("name: %s, dataDir: %s", k, v)
-		if err := os.MkdirAll(v, 0750); err != nil {
+	for k, v := range cfg.StoragePoolInfo {
+		if v.SnapshotPath != nil {
+			klog.V(1).Infof("name: %s, dataDir: %s, snapshotDir: %s", k, v.Path, *v.SnapshotPath)
+		} else {
+			klog.V(1).Infof("name: %s, dataDir: %s", k, v.Path)
+		}
+
+		if err := os.MkdirAll(v.Path, 0750); err != nil {
 			return nil, fmt.Errorf("failed to create dataRoot for storage pool %s: %v", k, err)
 		}
 	}
 
 	go func() {
-		evaluateSharedPathMetric(cfg.StoragePoolDataDir)
+		evaluateSharedPathMetric(cfg.StoragePoolInfo)
 		// Run this every minute so we catch the current state in metric (imagine people remounting on their own)
 		for {
 			select {
 			case <-time.After(1 * time.Minute):
-				evaluateSharedPathMetric(cfg.StoragePoolDataDir)
+				evaluateSharedPathMetric(cfg.StoragePoolInfo)
 			case <-ctx.Done():
 				return
 			}

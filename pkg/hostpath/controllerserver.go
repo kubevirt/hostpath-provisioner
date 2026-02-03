@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strconv"
+	"sync"
 
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"google.golang.org/grpc/codes"
@@ -36,12 +38,32 @@ const (
 
 type hostPathController struct {
 	csi.UnimplementedControllerServer
-	cfg *Config
+	cfg               *Config
+	snapshotproviders map[string]SnapshotProvider
+	snapMutex         sync.Mutex
 }
 
 func NewHostPathController(config *Config) *hostPathController {
+	snapshotProviders := make(map[string]SnapshotProvider)
+	for storagePool, storagePoolInfo := range config.StoragePoolInfo {
+		if storagePoolInfo.SnapshotProvider == nil {
+			continue
+		}
+		switch *storagePoolInfo.SnapshotProvider {
+		case ReflinkProvider:
+			snapshotProviders[storagePool] = &Reflink{
+				path:       *storagePoolInfo.SnapshotPath,
+				nodeName:   config.NodeID,
+				sourcePath: storagePoolInfo.Path,
+			}
+			// case KopiaProvider:
+			// 	snapshotProviders[storagePool] = &Kopia{
+			// 	},
+		}
+	}
 	return &hostPathController{
-		cfg: config,
+		cfg:               config,
+		snapshotproviders: snapshotProviders,
 	}
 }
 
@@ -103,25 +125,39 @@ func (hpc *hostPathController) CreateVolume(ctx context.Context, req *csi.Create
 	}
 
 	storagePoolName := getStoragePoolNameFromMap(req.GetParameters())
-	if _, ok := hpc.cfg.StoragePoolDataDir[storagePoolName]; !ok {
+	if _, ok := hpc.cfg.StoragePoolInfo[storagePoolName]; !ok {
 		return nil, fmt.Errorf("unable to locate path for storage pool %s", storagePoolName)
 	}
-	capacity, err := hpc.getVolumeDirCapacity(hpc.cfg.StoragePoolDataDir[storagePoolName])
+	capacity, err := hpc.getVolumeDirCapacity(hpc.cfg.StoragePoolInfo[storagePoolName].Path)
 	if err != nil {
 		return nil, err
 	}
 	topologies := []*csi.Topology{}
 	topologies = append(topologies, &csi.Topology{Segments: map[string]string{TopologyKeyNode: hpc.cfg.NodeID}})
 
-	if exists, err := checkPathExist(filepath.Join(hpc.cfg.StoragePoolDataDir[storagePoolName], req.GetName())); err != nil {
+	if exists, err := checkPathExist(filepath.Join(hpc.cfg.StoragePoolInfo[storagePoolName].Path, req.GetName())); err != nil {
 		return nil, err
 	} else if !exists {
-		if err := CreateVolume(hpc.cfg.StoragePoolDataDir[storagePoolName], req.GetName()); err != nil {
+		if err := CreateVolumeDirectory(hpc.cfg.StoragePoolInfo[storagePoolName].Path, req.GetName()); err != nil {
 			return nil, fmt.Errorf("failed to create volume %v: %w", req.GetName(), err)
 		}
-		klog.V(4).Infof("created volume %s at path %s", req.GetName(), filepath.Join(hpc.cfg.StoragePoolDataDir[storagePoolName], req.GetName()))
+		klog.V(4).Infof("created volume %s at path %s", req.GetName(), filepath.Join(hpc.cfg.StoragePoolInfo[storagePoolName].Path, req.GetName()))
 	}
 
+	if req.GetVolumeContentSource() != nil {
+		source := req.GetVolumeContentSource()
+		switch source.Type.(type) {
+		case *csi.VolumeContentSource_Snapshot:
+			if snapshot := source.GetSnapshot(); snapshot != nil {
+				if err := hpc.restoreFromSnapshot(snapshot.GetSnapshotId(), storagePoolName, req.GetName()); err != nil {
+					if err := DeleteVolume(hpc.cfg.StoragePoolInfo[storagePoolName].Path, req.GetName()); err != nil {
+						return nil, fmt.Errorf("failed to delete restore %v: %w", req.GetName(), err)
+					}
+					return nil, err
+				}
+			}
+		}
+	}
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			VolumeId:           req.Name,
@@ -200,7 +236,7 @@ func (hpc *hostPathController) ValidateVolumeCapabilities(ctx context.Context, r
 		}
 	}
 	storagePoolName := getStoragePoolNameFromMap(req.GetParameters())
-	if exists, err := checkPathExist(filepath.Join(hpc.cfg.StoragePoolDataDir[storagePoolName], req.GetVolumeId())); err != nil {
+	if exists, err := checkPathExist(filepath.Join(hpc.cfg.StoragePoolInfo[storagePoolName].Path, req.GetVolumeId())); err != nil {
 		return nil, err
 	} else if !exists {
 		return nil, status.Errorf(codes.NotFound, "volume %s not found", req.GetVolumeId())
@@ -229,10 +265,10 @@ func (hpc *hostPathController) GetCapacity(ctx context.Context, req *csi.GetCapa
 	}
 	storagePoolName := getStoragePoolNameFromMap(req.GetParameters())
 	klog.V(3).Infof("Checking capacity for storage pool %s", storagePoolName)
-	if _, ok := hpc.cfg.StoragePoolDataDir[storagePoolName]; !ok {
+	if _, ok := hpc.cfg.StoragePoolInfo[storagePoolName]; !ok {
 		return nil, fmt.Errorf("unable to locate path for storage pool %s", storagePoolName)
 	}
-	available, capacity, _, _, _, _, err := getPVStatsFunc(hpc.cfg.StoragePoolDataDir[storagePoolName])
+	available, capacity, _, _, _, _, err := getPVStatsFunc(hpc.cfg.StoragePoolInfo[storagePoolName].Path)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +280,7 @@ func (hpc *hostPathController) GetCapacity(ctx context.Context, req *csi.GetCapa
 }
 
 func (hpc *hostPathController) getVolumeDirectories() ([]string, error) {
-	return getVolumeDirectories(hpc.cfg.StoragePoolDataDir)
+	return getStoragePoolDataDirectories(hpc.cfg.StoragePoolInfo)
 }
 
 func (hpc *hostPathController) validateListVolumesRequest(req *csi.ListVolumesRequest) error {
@@ -267,17 +303,24 @@ func (hpc *hostPathController) ListVolumes(ctx context.Context, req *csi.ListVol
 	}
 
 	capacityMap := make(map[string]int64)
-	for _, path := range hpc.cfg.StoragePoolDataDir {
-		capacity, err := hpc.getVolumeDirCapacity(path)
+	for _, info := range hpc.cfg.StoragePoolInfo {
+		capacity, err := hpc.getVolumeDirCapacity(info.Path)
 		if err != nil {
 			return nil, err
 		}
-		capacityMap[path] = capacity
+		capacityMap[info.Path] = capacity
 	}
 
 	volumeDirs, err := hpc.getVolumeDirectories()
 	if err != nil {
 		return nil, err
+	}
+
+	if req.StartingToken != "" {
+		_, err = strconv.ParseUint(req.StartingToken, 10, 32)
+		if err != nil {
+			return nil, status.Error(codes.Aborted, "the type of startingToken should be integer")
+		}
 	}
 
 	if len(volumeDirs) > 0 {
@@ -338,12 +381,12 @@ func (hpc *hostPathController) ControllerGetVolume(ctx context.Context, req *csi
 	}
 
 	capacityMap := make(map[string]int64)
-	for _, path := range hpc.cfg.StoragePoolDataDir {
-		capacity, err := hpc.getVolumeDirCapacity(path)
+	for _, info := range hpc.cfg.StoragePoolInfo {
+		capacity, err := hpc.getVolumeDirCapacity(info.Path)
 		if err != nil {
 			return nil, err
 		}
-		capacityMap[path] = capacity
+		capacityMap[info.Path] = capacity
 	}
 	volumeDirs, err := hpc.getVolumeDirectories()
 	if err != nil {
@@ -376,16 +419,165 @@ func (hpc *hostPathController) ControllerGetVolume(ctx context.Context, req *csi
 	}, nil
 }
 
+func (hpc *hostPathController) validateCreateSnapshotRequest(req *csi.CreateSnapshotRequest) error {
+	if req == nil {
+		return status.Error(codes.InvalidArgument, "missing snapshot request")
+	}
+	if len(req.GetName()) == 0 {
+		return status.Error(codes.InvalidArgument, "name missing in snapshot request")
+	}
+	if len(req.GetSourceVolumeId()) == 0 {
+		return status.Error(codes.InvalidArgument, "source volume id missing in snapshot request")
+	}
+	return nil
+}
+
 func (hpc *hostPathController) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "createSnapshot is not supported")
+	if err := hpc.validateCreateSnapshotRequest(req); err != nil {
+		return nil, err
+	}
+	storagePoolName := getStoragePoolNameFromMap(req.GetParameters())
+	if _, ok := hpc.cfg.StoragePoolInfo[storagePoolName]; !ok {
+		return nil, fmt.Errorf("unable to locate volumesnapshot path for storage pool %s", storagePoolName)
+	}
+	if hpc.cfg.StoragePoolInfo[storagePoolName].SnapshotPath == nil {
+		return nil, fmt.Errorf("volumesnapshot path not set for storage pool %s", storagePoolName)
+	}
+	if hpc.snapshotproviders[storagePoolName] == nil {
+		return nil, fmt.Errorf("snapshot provider not set for storage pool %s", storagePoolName)
+	}
+	hpc.snapMutex.Lock()
+	defer hpc.snapMutex.Unlock()
+	if exists, err := checkPathExist(*hpc.cfg.StoragePoolInfo[storagePoolName].SnapshotPath); err != nil {
+		return nil, err
+	} else if !exists {
+		if err := hpc.snapshotproviders[storagePoolName].Initialize(); err != nil {
+			return nil, fmt.Errorf("failed to initialize snapshot storage pool %v", err)
+		}
+		klog.V(4).Info("Initialized snapshot provider")
+	}
+	// Check if a snapshot with the id already exists.
+	snapshot, err := hpc.snapshotproviders[storagePoolName].GetSnapshotById(req.GetName())
+	if err != nil {
+		return nil, fmt.Errorf("getsnapshot by id failed, %v", err)
+	}
+	if snapshot != nil {
+		// Snapshot already exists, check if the source volumes match.
+		if snapshot.GetSourceVolumeId() == req.GetSourceVolumeId() {
+			return &csi.CreateSnapshotResponse{
+				Snapshot: snapshot,
+			}, err
+		} else {
+			return nil, status.Errorf(codes.AlreadyExists, "snapshot with the same name: %s but with different SourceVolumeId already exist", req.GetName())
+		}
+	}
+	// Snapshot not found, create it.
+	snapshot, err = hpc.snapshotproviders[storagePoolName].CreateSnapshot(req.GetName(), req.GetSourceVolumeId())
+	if err != nil {
+		return nil, err
+	}
+	return &csi.CreateSnapshotResponse{
+		Snapshot: snapshot,
+	}, err
 }
 
 func (hpc *hostPathController) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "deleteSnapshot is not supported")
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "missing request")
+	}
+	if len(req.GetSnapshotId()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "snapshot id missing in request")
+	}
+	hpc.snapMutex.Lock()
+	defer hpc.snapMutex.Unlock()
+	for _, snapshotProvider := range hpc.snapshotproviders {
+		if err := snapshotProvider.DeleteSnapshot(req.GetSnapshotId()); err != nil {
+			return nil, err
+		}
+	}
+	return &csi.DeleteSnapshotResponse{}, nil
 }
 
 func (hpc *hostPathController) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "listSnapshots is not supported")
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "missing request")
+	}
+	hpc.snapMutex.Lock()
+	defer hpc.snapMutex.Unlock()
+
+	var snapshots []csi.Snapshot
+	for _, snapshotProvider := range hpc.snapshotproviders {
+		if len(req.GetSnapshotId()) != 0 {
+			snapshot, err := snapshotProvider.GetSnapshotById(req.GetSnapshotId())
+			if err != nil {
+				return nil, err
+			}
+			if snapshot != nil {
+				snapshots = append(snapshots, *snapshot)
+			}
+		} else if len(req.GetSourceVolumeId()) != 0 {
+			snapshotsByVolume, err := snapshotProvider.GetSnapshotsByVolumeSourceId(req.GetSourceVolumeId())
+			if err != nil {
+				return nil, err
+			}
+			snapshots = append(snapshots, snapshotsByVolume...)
+		} else {
+			allProviderSnapshots, err := snapshotProvider.GetAllSnapshots()
+			if err != nil {
+				return nil, err
+			}
+			snapshots = append(snapshots, allProviderSnapshots...)
+		}
+	}
+	snapshotRes := &csi.ListSnapshotsResponse{}
+	if len(snapshots) > 0 {
+		snapshotRes.Entries = []*csi.ListSnapshotsResponse_Entry{}
+		if req.StartingToken == "" || req.StartingToken == "0" {
+			req.StartingToken = "1"
+		}
+
+		snapshotLength := int64(len(snapshots))
+		maxLength := int64(req.MaxEntries)
+		if maxLength == 0 {
+			maxLength = snapshotLength
+		}
+		start, err := strconv.ParseUint(req.StartingToken, 10, 32)
+		if err != nil {
+			return nil, status.Error(codes.Aborted, "the type of startingToken should be integer")
+		}
+		start = start - 1
+		end := int64(start) + maxLength
+
+		if end > snapshotLength {
+			end = snapshotLength
+		}
+
+		for _, val := range snapshots[start:end] {
+			snapshotRes.Entries = append(snapshotRes.Entries, &csi.ListSnapshotsResponse_Entry{
+				Snapshot: &val,
+			})
+		}
+		if end < snapshotLength-1 {
+			snapshotRes.NextToken = strconv.FormatInt(end+1, 10)
+		}
+	} else {
+		if req.StartingToken != "" {
+			return nil, status.Errorf(codes.Aborted, "snapshot %s not found", req.StartingToken)
+		}
+	}
+
+	return snapshotRes, nil
+}
+
+func (hpc *hostPathController) restoreFromSnapshot(snapshotId, storagePoolName, targetVolume string) error {
+	hpc.snapMutex.Lock()
+	defer hpc.snapMutex.Unlock()
+
+	if _, ok := hpc.snapshotproviders[storagePoolName]; !ok {
+		return fmt.Errorf("unable to restore snapshot because unable to locate snapshot provider for storage pool %s", storagePoolName)
+	}
+	targetPath := filepath.Join(hpc.cfg.StoragePoolInfo[storagePoolName].Path, targetVolume)
+	return hpc.snapshotproviders[storagePoolName].RestoreSnapshot(snapshotId, targetPath)
 }
 
 func (hpc *hostPathController) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
@@ -403,6 +595,8 @@ func (hpc *hostPathController) getControllerServiceCapabilities() []*csi.Control
 		csi.ControllerServiceCapability_RPC_GET_VOLUME,
 		csi.ControllerServiceCapability_RPC_GET_CAPACITY,
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
+		csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
+		csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
 		csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
 	}
 
@@ -417,6 +611,5 @@ func (hpc *hostPathController) getControllerServiceCapabilities() []*csi.Control
 			},
 		})
 	}
-
 	return csc
 }

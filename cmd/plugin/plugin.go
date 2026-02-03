@@ -36,7 +36,7 @@ func main() {
 	flag.Set("logtostderr", "true")
 	flag.StringVar(&cfg.Endpoint, "endpoint", "unix://tmp/csi.sock", "CSI endpoint")
 	flag.StringVar(&cfg.DriverName, "drivername", "hostpath.csi.kubevirt.io", "name of the driver")
-	flag.StringVar(&dataDir, "datadir", "[{\"name\":\"legacy\",\"path\":\"/csi-data-dir\"}]", "storage pool name/path tupels that indicate which storage pool name is associated with which path, in JSON format. Example: [{\"name\":\"legacy\",\"path\":\"/csi-data-dir\"}]")
+	flag.StringVar(&dataDir, "datadir", "[{\"name\":\"legacy\",\"path\":\"/csi-data-dir\",\"snapshotPath\":\"/snap-dir\", \"snapshotProvider\":\"reflink\"}]", "storage pool array with each entry including, storage pool name, directory path, and optional snapshot directory path and snapshot provider, all of this in JSON format. Example: [{\"name\":\"legacy\",\"path\":\"/csi-data-dir\",\"snapshotPath\":\"/snap-dir\",\"snapshotProvider\":\"reflink\"}]")
 	flag.StringVar(&cfg.NodeID, "nodeid", "", "node id")
 	flag.StringVar(&cfg.Version, "version", "", "version of the plugin")
 	flag.Parse()
