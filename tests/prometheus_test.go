@@ -48,7 +48,7 @@ const (
 	prometheusCRDName        = "prometheuses.monitoring.coreos.com"
 	prometheusSaName         = "prometheus-k8s"
 	prometheusSaSecretPrefix = "prometheus-k8s-token"
-	operatorUpQueryName      = "kubevirt_hpp_operator_up"
+	operatorUpQueryName      = "cluster:kubevirt_hpp_operator_up:sum"
 	hppCRReadyQueryName      = "kubevirt_hpp_cr_ready"
 	hppPoolSharedQueryName   = "kubevirt_hpp_pool_path_shared_with_os"
 	promRuleOperatorUp       = "1"
