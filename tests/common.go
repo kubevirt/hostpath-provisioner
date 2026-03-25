@@ -44,8 +44,11 @@ const (
 	GiB int64 = 1024 * MiB
 	TiB int64 = 1024 * GiB
 
-	csiProvisionerName    = "kubevirt.io.hostpath-provisioner"
-	legacyProvisionerName = "kubevirt.io/hostpath-provisioner"
+	csiProvisionerName              = "kubevirt.io.hostpath-provisioner"
+	legacyProvisionerName           = "kubevirt.io/hostpath-provisioner"
+	csiStorageClassName             = "hostpath-csi"
+	legacyStorageClassName          = "hostpath-provisioner"
+	legacyStorageClassNameImmediate = "hostpath-provisioner-immediate"
 )
 
 func setupTestCase(t *testing.T) (func(*testing.T), *kubernetes.Clientset) {
