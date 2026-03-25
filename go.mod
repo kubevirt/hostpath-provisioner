@@ -1,8 +1,6 @@
 module kubevirt.io/hostpath-provisioner
 
-go 1.24.0
-
-toolchain go1.24.1
+go 1.25.0
 
 require (
 	github.com/container-storage-interface/spec v1.9.0
@@ -17,7 +15,7 @@ require (
 	github.com/rhobs/operator-observability-toolkit v0.0.30
 	golang.org/x/net v0.48.0
 	golang.org/x/sys v0.41.0
-	golang.org/x/time v0.9.0
+	golang.org/x/time v0.15.0
 	google.golang.org/grpc v1.79.3
 	k8s.io/api v0.28.4
 	k8s.io/apiextensions-apiserver v0.28.4
