@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -142,11 +142,11 @@ func (hpn *hostPathNode) mountVolume(targetPath string, req *csi.NodePublishVolu
 	path := ""
 	if isEphemeralVolumeRequest(req) {
 		path = hpn.getEphemeralVolumePath(storagePoolName, volumeId)
-		if err := CreateVolume(filepath.Dir(path), volumeId); err != nil {
+		if err := CreateVolumeDirectory(filepath.Dir(path), volumeId); err != nil {
 			return fmt.Errorf("failed to create ephemeral volume %v: %w", volumeId, err)
 		}
 	} else {
-		path = filepath.Join(hpn.cfg.StoragePoolDataDir[storagePoolName], volumeId)
+		path = filepath.Join(hpn.cfg.StoragePoolInfo[storagePoolName].Path, volumeId)
 	}
 
 	if err := mounter.Mount(path, targetPath, fsType, options); err != nil {
@@ -177,9 +177,9 @@ func isEphemeralVolumeId(volumeId string) bool {
 }
 
 func (hpn *hostPathNode) getEphemeralVolumePath(storagePoolName, volumeId string) string {
-	storagePoolPath := hpn.cfg.StoragePoolDataDir[storagePoolName]
+	storagePoolPath := hpn.cfg.StoragePoolInfo[storagePoolName].Path
 	if len(storagePoolPath) == 0 {
-		storagePoolPath = hpn.cfg.StoragePoolDataDir[hpn.cfg.DefaultStoragePoolName]
+		storagePoolPath = hpn.cfg.StoragePoolInfo[hpn.cfg.DefaultStoragePoolName].Path
 	}
 	return filepath.Join(storagePoolPath, volumeId)
 }
@@ -254,7 +254,7 @@ func (hpn *hostPathNode) removeEphemeralPath(volumeId string) error {
 }
 
 func (hpn *hostPathNode) getVolumeDirectories() ([]string, error) {
-	return getVolumeDirectories(hpn.cfg.StoragePoolDataDir)
+	return getStoragePoolDataDirectories(hpn.cfg.StoragePoolInfo)
 }
 
 func (hpn *hostPathNode) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {

@@ -19,7 +19,6 @@ package hostpath
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -61,7 +60,7 @@ func Test_NodeGetVolumeStatsValidation(t *testing.T) {
 	})
 	t.Run("invalid volume path", func(t *testing.T) {
 		_, err := nodeServer.NodeGetVolumeStats(context.TODO(), &csi.NodeGetVolumeStatsRequest{
-			VolumeId: "abcd",
+			VolumeId:   "abcd",
 			VolumePath: "/invalidpath",
 		})
 		_, expectedWrappedErr := os.Stat("/invalidpath")
@@ -73,20 +72,20 @@ func Test_NodeGetVolumeStatsHealthy(t *testing.T) {
 	RegisterTestingT(t)
 	defer func() {
 		checkMountPointExistsFunc = checkMountPointExist
-	} ()
+	}()
 
 	checkMountPointExistsFunc = func(volumePath string) (bool, error) {
 		// Mount point exists!
 		return true, nil
 	}
 
-	tempDir, err := ioutil.TempDir(os.TempDir(), "")
+	tempDir, err := os.MkdirTemp(os.TempDir(), "")
 	Expect(err).ToNot(HaveOccurred())
 	defer os.RemoveAll(tempDir)
 
 	nodeServer := createNodeServer(testNode)
 	resp, err := nodeServer.NodeGetVolumeStats(context.TODO(), &csi.NodeGetVolumeStatsRequest{
-		VolumeId: "abcd",
+		VolumeId:   "abcd",
 		VolumePath: tempDir,
 	})
 	Expect(err).ToNot(HaveOccurred())
@@ -98,20 +97,20 @@ func Test_NodeGetVolumeStatsUnhealthy(t *testing.T) {
 	RegisterTestingT(t)
 	defer func() {
 		checkMountPointExistsFunc = checkMountPointExist
-	} ()
+	}()
 
 	checkMountPointExistsFunc = func(volumePath string) (bool, error) {
 		// Mount point missing exists!
 		return false, nil
 	}
 
-	tempDir, err := ioutil.TempDir(os.TempDir(), "")
+	tempDir, err := os.MkdirTemp(os.TempDir(), "")
 	Expect(err).ToNot(HaveOccurred())
 	defer os.RemoveAll(tempDir)
 
 	nodeServer := createNodeServer(testNode)
 	resp, err := nodeServer.NodeGetVolumeStats(context.TODO(), &csi.NodeGetVolumeStatsRequest{
-		VolumeId: "abcd",
+		VolumeId:   "abcd",
 		VolumePath: tempDir,
 	})
 	Expect(err).ToNot(HaveOccurred())
@@ -161,7 +160,7 @@ func Test_NodeUnpublishVolumeValidation(t *testing.T) {
 func Test_NodeUnpublishVolumeNotMount(t *testing.T) {
 	RegisterTestingT(t)
 	nodeServer := createNodeServer(testNode)
-	tempDir, err := ioutil.TempDir(os.TempDir(), "")
+	tempDir, err := os.MkdirTemp(os.TempDir(), "")
 	Expect(err).ToNot(HaveOccurred())
 	defer os.RemoveAll(tempDir)
 
@@ -170,7 +169,7 @@ func Test_NodeUnpublishVolumeNotMount(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	_, err = nodeServer.NodeUnpublishVolume(context.TODO(), &csi.NodeUnpublishVolumeRequest{
-		VolumeId: "abcd",
+		VolumeId:   "abcd",
 		TargetPath: tempDir,
 	})
 	Expect(err).ToNot(HaveOccurred())
@@ -180,14 +179,14 @@ func Test_NodeUnpublishVolumeNotMount(t *testing.T) {
 	Expect(os.IsNotExist(err)).To(BeTrue())
 	// Repeat call to ensure idempotency
 	_, err = nodeServer.NodeUnpublishVolume(context.TODO(), &csi.NodeUnpublishVolumeRequest{
-		VolumeId: "abcd",
+		VolumeId:   "abcd",
 		TargetPath: tempDir,
 	})
 	Expect(err).ToNot(HaveOccurred())
 }
 
 func Test_NodeUnpublishVolumeMount(t *testing.T) {
-	tempDir, err := ioutil.TempDir(os.TempDir(), "")
+	tempDir, err := os.MkdirTemp(os.TempDir(), "")
 	Expect(err).ToNot(HaveOccurred())
 	defer os.RemoveAll(tempDir)
 	RegisterTestingT(t)
@@ -195,8 +194,8 @@ func Test_NodeUnpublishVolumeMount(t *testing.T) {
 	fakeMounter := mount.NewFakeMounter([]mount.MountPoint{
 		{
 			Device: "/dev/test",
-			Path: tempDir,
-			Type: "disk",
+			Path:   tempDir,
+			Type:   "disk",
 		},
 	})
 	fakeMounter.UnmountFunc = func(path string) error {
@@ -210,7 +209,7 @@ func Test_NodeUnpublishVolumeMount(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	_, err = nodeServer.NodeUnpublishVolume(context.TODO(), &csi.NodeUnpublishVolumeRequest{
-		VolumeId: "abcd",
+		VolumeId:   "abcd",
 		TargetPath: tempDir,
 	})
 	Expect(err).ToNot(HaveOccurred())
@@ -220,14 +219,14 @@ func Test_NodeUnpublishVolumeMount(t *testing.T) {
 	Expect(os.IsNotExist(err)).To(BeTrue())
 	// Repeat call to ensure idempotency
 	_, err = nodeServer.NodeUnpublishVolume(context.TODO(), &csi.NodeUnpublishVolumeRequest{
-		VolumeId: "abcd",
+		VolumeId:   "abcd",
 		TargetPath: tempDir,
 	})
 	Expect(err).ToNot(HaveOccurred())
 }
 
 func Test_NodeUnpublishVolumeMountLikelyError(t *testing.T) {
-	tempDir, err := ioutil.TempDir(os.TempDir(), "")
+	tempDir, err := os.MkdirTemp(os.TempDir(), "")
 	Expect(err).ToNot(HaveOccurred())
 	defer os.RemoveAll(tempDir)
 	RegisterTestingT(t)
@@ -235,8 +234,8 @@ func Test_NodeUnpublishVolumeMountLikelyError(t *testing.T) {
 	fakeMounter := mount.NewFakeMounter([]mount.MountPoint{
 		{
 			Device: "/dev/test",
-			Path: tempDir,
-			Type: "disk",
+			Path:   tempDir,
+			Type:   "disk",
 		},
 	})
 	fakeMounter.MountCheckErrors = make(map[string]error)
@@ -244,15 +243,15 @@ func Test_NodeUnpublishVolumeMountLikelyError(t *testing.T) {
 	nodeServer.cfg.Mounter = fakeMounter
 
 	_, err = nodeServer.NodeUnpublishVolume(context.TODO(), &csi.NodeUnpublishVolumeRequest{
-		VolumeId: "abcd",
+		VolumeId:   "abcd",
 		TargetPath: tempDir,
 	})
 	Expect(err).To(HaveOccurred())
 	Expect(err.Error()).To(ContainSubstring("likelyMountError"))
 }
 
-func Test_NodeUnpublishVolumeMountUnmountError (t *testing.T) {
-	tempDir, err := ioutil.TempDir(os.TempDir(), "")
+func Test_NodeUnpublishVolumeMountUnmountError(t *testing.T) {
+	tempDir, err := os.MkdirTemp(os.TempDir(), "")
 	Expect(err).ToNot(HaveOccurred())
 	defer os.RemoveAll(tempDir)
 	RegisterTestingT(t)
@@ -260,8 +259,8 @@ func Test_NodeUnpublishVolumeMountUnmountError (t *testing.T) {
 	fakeMounter := mount.NewFakeMounter([]mount.MountPoint{
 		{
 			Device: "/dev/test",
-			Path: tempDir,
-			Type: "disk",
+			Path:   tempDir,
+			Type:   "disk",
 		},
 	})
 	fakeMounter.UnmountFunc = func(path string) error {
@@ -271,11 +270,11 @@ func Test_NodeUnpublishVolumeMountUnmountError (t *testing.T) {
 	nodeServer.cfg.Mounter = fakeMounter
 
 	_, err = nodeServer.NodeUnpublishVolume(context.TODO(), &csi.NodeUnpublishVolumeRequest{
-		VolumeId: "abcd",
+		VolumeId:   "abcd",
 		TargetPath: tempDir,
 	})
 	Expect(err).To(HaveOccurred())
-	Expect(err.Error()).To(ContainSubstring("unmountError"))	
+	Expect(err.Error()).To(ContainSubstring("unmountError"))
 }
 
 func Test_validateRequestCapabilties(t *testing.T) {
@@ -300,7 +299,7 @@ func Test_validateRequestCapabilties(t *testing.T) {
 	})
 	t.Run("missing volume capability", func(t *testing.T) {
 		err := nodeServer.validateRequestCapabilties(&csi.NodePublishVolumeRequest{
-			VolumeId: "abcd",
+			VolumeId:   "abcd",
 			TargetPath: "/test",
 		})
 		Expect(err).To(HaveOccurred())
@@ -308,8 +307,8 @@ func Test_validateRequestCapabilties(t *testing.T) {
 	})
 	t.Run("valid request", func(t *testing.T) {
 		err := nodeServer.validateRequestCapabilties(&csi.NodePublishVolumeRequest{
-			VolumeId: "abcd",
-			TargetPath: "/test",
+			VolumeId:         "abcd",
+			TargetPath:       "/test",
 			VolumeCapability: &csi.VolumeCapability{},
 		})
 		Expect(err).ToNot(HaveOccurred())
@@ -322,16 +321,16 @@ func Test_validateNodePublishRequest(t *testing.T) {
 
 	t.Run("missing capability", func(t *testing.T) {
 		err := nodeServer.validateNodePublishRequest(&csi.NodePublishVolumeRequest{
-			VolumeId: "abcd",
-			TargetPath: "/test",
+			VolumeId:         "abcd",
+			TargetPath:       "/test",
 			VolumeCapability: &csi.VolumeCapability{},
 		})
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(BeEquivalentTo(status.Error(codes.InvalidArgument, "can only publish a non-block volume")))
-	})	
+	})
 	t.Run("block volume capability", func(t *testing.T) {
 		err := nodeServer.validateNodePublishRequest(&csi.NodePublishVolumeRequest{
-			VolumeId: "abcd",
+			VolumeId:   "abcd",
 			TargetPath: "/test",
 			VolumeCapability: &csi.VolumeCapability{
 				AccessType: &csi.VolumeCapability_Block{
@@ -344,7 +343,7 @@ func Test_validateNodePublishRequest(t *testing.T) {
 	})
 	t.Run("valid request", func(t *testing.T) {
 		err := nodeServer.validateNodePublishRequest(&csi.NodePublishVolumeRequest{
-			VolumeId: "abcd",
+			VolumeId:   "abcd",
 			TargetPath: "/test",
 			VolumeCapability: &csi.VolumeCapability{
 				AccessType: &csi.VolumeCapability_Mount{
@@ -358,14 +357,14 @@ func Test_validateNodePublishRequest(t *testing.T) {
 
 func Test_NodePublishVolumeValidMountPoint(t *testing.T) {
 	RegisterTestingT(t)
-	tempDir, err := ioutil.TempDir(os.TempDir(), "")
+	tempDir, err := os.MkdirTemp(os.TempDir(), "")
 	Expect(err).ToNot(HaveOccurred())
 	defer os.RemoveAll(tempDir)
 	nodeServer := createNodeServer(testNode)
 	fakeMounter := mount.NewFakeMounter([]mount.MountPoint{})
 	nodeServer.cfg.Mounter = fakeMounter
 	_, err = nodeServer.NodePublishVolume(context.TODO(), &csi.NodePublishVolumeRequest{
-		VolumeId: "abcd",
+		VolumeId:   "abcd",
 		TargetPath: filepath.Join(tempDir, validVolId),
 		VolumeCapability: &csi.VolumeCapability{
 			AccessType: &csi.VolumeCapability_Mount{
@@ -389,15 +388,17 @@ func Test_NodePublishVolumeValidMountPoint(t *testing.T) {
 
 func Test_NodePublishVolumeEphemeral(t *testing.T) {
 	RegisterTestingT(t)
-	tempDir, err := ioutil.TempDir(os.TempDir(), "")
+	tempDir, err := os.MkdirTemp(os.TempDir(), "")
 	Expect(err).ToNot(HaveOccurred())
 	defer os.RemoveAll(tempDir)
 	nodeServer := createNodeServer(testNode)
 	fakeMounter := mount.NewFakeMounter([]mount.MountPoint{})
 	nodeServer.cfg.Mounter = fakeMounter
-	nodeServer.cfg.DefaultStoragePoolName = "test"
-	nodeServer.cfg.StoragePoolDataDir = make(map[string]string)
-	nodeServer.cfg.StoragePoolDataDir["test"] = tempDir
+	nodeServer.cfg.DefaultStoragePoolName = legacyStoragePoolName
+	nodeServer.cfg.StoragePoolInfo = make(map[string]StoragePoolInfo)
+	nodeServer.cfg.StoragePoolInfo[legacyStoragePoolName] = StoragePoolInfo{
+		Path: tempDir,
+	}
 	_, err = nodeServer.NodePublishVolume(context.TODO(), &csi.NodePublishVolumeRequest{
 		VolumeId: "csi-abcd",
 		VolumeContext: map[string]string{
@@ -427,7 +428,7 @@ func Test_NodePublishVolumeEphemeral(t *testing.T) {
 	Expect(mountPoint.Opts).To(ContainElement("bind"))
 	t.Log("Unpublish ephemeral")
 	_, err = nodeServer.NodeUnpublishVolume(context.TODO(), &csi.NodeUnpublishVolumeRequest{
-		VolumeId: "csi-abcd",
+		VolumeId:   "csi-abcd",
 		TargetPath: filepath.Join(tempDir, validVolId),
 	})
 	Expect(err).ToNot(HaveOccurred())
@@ -436,7 +437,7 @@ func Test_NodePublishVolumeEphemeral(t *testing.T) {
 	Expect(os.IsNotExist(err)).To(BeTrue())
 	t.Log("Unpublish ephemeral again")
 	_, err = nodeServer.NodeUnpublishVolume(context.TODO(), &csi.NodeUnpublishVolumeRequest{
-		VolumeId: "csi-abcd",
+		VolumeId:   "csi-abcd",
 		TargetPath: filepath.Join(tempDir, validVolId),
 	})
 	Expect(err).ToNot(HaveOccurred())
@@ -447,16 +448,16 @@ func Test_NodePublishVolumeEphemeral(t *testing.T) {
 
 func Test_NodePublishVolumeValidMountPointReadOnly(t *testing.T) {
 	RegisterTestingT(t)
-	tempDir, err := ioutil.TempDir(os.TempDir(), "")
+	tempDir, err := os.MkdirTemp(os.TempDir(), "")
 	Expect(err).ToNot(HaveOccurred())
 	defer os.RemoveAll(tempDir)
 	nodeServer := createNodeServer(testNode)
 	fakeMounter := mount.NewFakeMounter([]mount.MountPoint{})
 	nodeServer.cfg.Mounter = fakeMounter
 	_, err = nodeServer.NodePublishVolume(context.TODO(), &csi.NodePublishVolumeRequest{
-		VolumeId: "abcd",
+		VolumeId:   "abcd",
 		TargetPath: filepath.Join(tempDir, validVolId),
-		Readonly: true,
+		Readonly:   true,
 		VolumeCapability: &csi.VolumeCapability{
 			AccessType: &csi.VolumeCapability_Mount{
 				Mount: &csi.VolumeCapability_MountVolume{
@@ -486,7 +487,7 @@ func Test_NodePublishVolumeInValidMountPoint(t *testing.T) {
 	fakeMounter.MountCheckErrors["/test"] = fmt.Errorf("likelyMountError")
 	nodeServer.cfg.Mounter = fakeMounter
 	_, err := nodeServer.NodePublishVolume(context.TODO(), &csi.NodePublishVolumeRequest{
-		VolumeId: "abcd",
+		VolumeId:   "abcd",
 		TargetPath: "/test",
 		VolumeCapability: &csi.VolumeCapability{
 			AccessType: &csi.VolumeCapability_Mount{
@@ -507,24 +508,24 @@ func Test_NodeGetCapabilities(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(resp.Capabilities).ToNot(BeEmpty())
 	Expect(resp.Capabilities).To(ContainElement(&csi.NodeServiceCapability{
-			Type: &csi.NodeServiceCapability_Rpc{
-				Rpc: &csi.NodeServiceCapability_RPC{
-					Type: csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
-				},
+		Type: &csi.NodeServiceCapability_Rpc{
+			Rpc: &csi.NodeServiceCapability_RPC{
+				Type: csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
 			},
-		}))
+		},
+	}))
 	Expect(resp.Capabilities).To(ContainElement(&csi.NodeServiceCapability{
-			Type: &csi.NodeServiceCapability_Rpc{
-				Rpc: &csi.NodeServiceCapability_RPC{
-					Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
-				},
+		Type: &csi.NodeServiceCapability_Rpc{
+			Rpc: &csi.NodeServiceCapability_RPC{
+				Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
 			},
-		}))
+		},
+	}))
 }
 
 func createNodeServer(nodeId string) *hostPathNode {
 	config := Config{
-		NodeID: nodeId,
+		NodeID:  nodeId,
 		Mounter: mount.NewFakeMounter([]mount.MountPoint{}),
 	}
 	return NewHostPathNode(&config)

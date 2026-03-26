@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,8 +18,8 @@ package sanity
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -31,18 +31,19 @@ import (
 
 const (
 	sanityEndpoint   = "sanity.sock"
-	TestDatadirValue = "[{\"name\":\"legacy\",\"path\":\"%s\"}]"
+	TestDatadirValue = "[{\"name\":\"legacy\",\"path\":\"%s\", \"snapshotPath\":\"%s\",\"snapshotProvider\":\"reflink\"}]"
 )
 
 func TestMyDriver(t *testing.T) {
 	RegisterTestingT(t)
 	// Setup the full driver and its environment
-	tempDir, err := ioutil.TempDir(os.TempDir(), "csi-sanity")
+	tempDir, err := os.MkdirTemp(os.TempDir(), "csi-sanity")
 	Expect(err).ToNot(HaveOccurred())
 	defer os.RemoveAll(tempDir)
 
 	targetDir := filepath.Join(tempDir, "target-csi")
 	volumeDir := filepath.Join(tempDir, "hpvolumes-csi")
+	snapshotDir := filepath.Join(tempDir, "snapshots-csi")
 
 	err = os.Mkdir(volumeDir, 0666)
 	Expect(err).ToNot(HaveOccurred())
@@ -53,7 +54,8 @@ func TestMyDriver(t *testing.T) {
 	cfg.Version = "test-version"
 	cfg.NodeID = "testnode"
 
-	driver, err := hostpath.NewHostPathDriver(context.TODO(), cfg, fmt.Sprintf(TestDatadirValue, volumeDir))
+	driver, err := hostpath.NewHostPathDriver(context.TODO(), cfg, fmt.Sprintf(TestDatadirValue, volumeDir, snapshotDir))
+	hostpath.CopyReflinkFunc = regularCopy
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {
@@ -68,4 +70,12 @@ func TestMyDriver(t *testing.T) {
 
 	// Now call the test suite
 	sanity.Test(t, testConfig)
+}
+
+func regularCopy(src, dst string) error {
+	cmd := exec.Command("cp", "-r", src, dst)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to copy %s to %s: %w", src, dst, err)
+	}
+	return nil
 }
