@@ -23,10 +23,12 @@ import (
 	"os"
 	"os/exec"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	extclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	hostpathprovisionerv1 "kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1"
 	hostpathprovisioner "kubevirt.io/hostpath-provisioner-operator/pkg/client/clientset/versioned"
 
 	"github.com/onsi/gomega"
@@ -250,4 +252,19 @@ func isLegacyHPPAvailable() bool {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	return cr.Spec.PathConfig != nil
+}
+
+// updateHPPWithRetry updates a HostPathProvisioner with retry logic to handle conflicts
+func updateHPPWithRetry(hppClient *hostpathprovisioner.Clientset, name string, updateFunc func(*hostpathprovisionerv1.HostPathProvisioner)) {
+	gomega.Eventually(func() error {
+		hpp, err := hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		updateFunc(hpp)
+
+		_, err = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Update(context.TODO(), hpp, metav1.UpdateOptions{})
+		return err
+	}, 10*time.Second, 200*time.Millisecond).Should(gomega.Succeed())
 }

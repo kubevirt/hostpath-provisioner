@@ -88,6 +88,9 @@ type promMetric struct {
 func TestPrometheusMetrics(t *testing.T) {
 	k8sClient, _, token := prometheusTestSetup(t)
 
+	// Wait for Prometheus to scrape metrics at least once
+	waitForPrometheusMetrics(token)
+
 	t.Run("Operator Up", func(t *testing.T) {
 		testPrometheusRule(token, operatorUpQueryName, promRuleOperatorUp)
 	})
@@ -125,11 +128,6 @@ func TestPrometheusAlerts(t *testing.T) {
 		return hpp
 	}
 
-	updateHPP := func(hpp *hostpathprovisionerv1.HostPathProvisioner) {
-		_, err := hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Update(context.Background(), hpp, metav1.UpdateOptions{})
-		Expect(err).ToNot(HaveOccurred())
-	}
-
 	hpp := getHPP()
 	oldSpec := hpp.Spec.DeepCopy()
 
@@ -144,24 +142,25 @@ func TestPrometheusAlerts(t *testing.T) {
 	})
 
 	t.Run("HPPNotReady", func(t *testing.T) {
-		hpp.Spec.Workload.NodeSelector = map[string]string{"non-existing": "label"}
-		updateHPP(hpp)
+		updateHPPWithRetry(hppClient, "hostpath-provisioner", func(hpp *hostpathprovisionerv1.HostPathProvisioner) {
+			hpp.Spec.Workload.NodeSelector = map[string]string{"non-existing": "label"}
+		})
 
 		testPrometheusRule(token, hppCRReadyQueryName, promRuleCRNotReady)
 
 		testPrometheusAlert("HPPNotReady", token, t)
 
-		hpp := getHPP()
-		hpp.Spec = *oldSpec
-		updateHPP(hpp)
+		updateHPPWithRetry(hppClient, "hostpath-provisioner", func(hpp *hostpathprovisionerv1.HostPathProvisioner) {
+			hpp.Spec = *oldSpec
+		})
 
 		testPrometheusRule(token, hppCRReadyQueryName, promRuleCRReady)
 	})
 
 	_ = scaleOperatorUp(k8sClient)
-	hpp = getHPP()
-	hpp.Spec = *oldSpec
-	updateHPP(hpp)
+	updateHPPWithRetry(hppClient, "hostpath-provisioner", func(hpp *hostpathprovisionerv1.HostPathProvisioner) {
+		hpp.Spec = *oldSpec
+	})
 }
 
 func prometheusTestSetup(t *testing.T) (*kubernetes.Clientset, *hostpathprovisioner.Clientset, string) {
@@ -186,6 +185,23 @@ func prometheusTestSetup(t *testing.T) (*kubernetes.Clientset, *hostpathprovisio
 	Expect(err).ToNot(HaveOccurred())
 
 	return k8sClient, hppClient, token
+}
+
+func waitForPrometheusMetrics(token string) {
+	// Wait for Prometheus to have any HPP metrics available
+	prometheusURL := fmt.Sprintf("%s/api/v1/query?query=%s", getPrometheusBaseURL(), operatorUpQueryName)
+	url, err := url.Parse(prometheusURL)
+	Expect(err).ToNot(HaveOccurred())
+
+	Eventually(func() bool {
+		bodyBytes := makePrometheusHTTPRequest(url, token)
+		var result promQueryResult
+		if err := json.Unmarshal(bodyBytes, &result); err != nil {
+			return false
+		}
+		// Just check if we got any result back - don't care about the value yet
+		return len(result.Data.Result) > 0 && len(result.Data.Result[0].Value) > 1
+	}, 3*time.Minute, 5*time.Second).Should(BeTrue(), "Prometheus metrics should be available")
 }
 
 func testPrometheusRule(token, promQuery, value string) {
