@@ -16,13 +16,13 @@ limitations under the License.
 package hostpath
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
@@ -35,6 +35,7 @@ const (
 )
 
 type hostPathNode struct {
+	csi.UnimplementedNodeServer
 	cfg *Config
 }
 
@@ -79,7 +80,7 @@ func (hpn *hostPathNode) validateNodePublishRequest(req *csi.NodePublishVolumeRe
 
 func (hpn *hostPathNode) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	if req != nil {
-		klog.V(3).Infof("Node Publish Request: %+v", *req)
+		klog.V(3).Infof("Node Publish Request: %+v", req)
 	}
 	if err := hpn.validateNodePublishRequest(req); err != nil {
 		return nil, err
@@ -196,7 +197,7 @@ func (hpn *hostPathNode) validateNodeUnpublishRequest(req *csi.NodeUnpublishVolu
 
 func (hpn *hostPathNode) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	if req != nil {
-		klog.V(3).Infof("Node Unpublish Request: %+v", *req)
+		klog.V(3).Infof("Node Unpublish Request: %+v", req)
 	}
 	if err := hpn.validateNodeUnpublishRequest(req); err != nil {
 		return nil, err
@@ -311,7 +312,7 @@ func (hpn *hostPathNode) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGe
 	if err := hpn.validateNodeGetVolumeStatsRequest(req); err != nil {
 		return nil, err
 	}
-	klog.V(3).Infof("Node Get Volume Stats Request: %+v", *req)
+	klog.V(3).Infof("Node Get Volume Stats Request: %+v", req)
 
 	if _, err := os.Stat(req.GetVolumePath()); err != nil {
 		return nil, status.Errorf(codes.NotFound, "Could not get file information from %s: %+v", req.GetVolumePath(), err)

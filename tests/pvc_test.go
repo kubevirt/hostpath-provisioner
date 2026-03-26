@@ -32,10 +32,7 @@ import (
 )
 
 const (
-	csiStorageClassName             = "hostpath-csi"
-	legacyStorageClassName          = "hostpath-provisioner"
-	legacyStorageClassNameImmediate = "hostpath-provisioner-immediate"
-	testMountName                   = "testmount"
+	testMountName = "testmount"
 )
 
 func TestCreatePVCOnNode1(t *testing.T) {

@@ -17,11 +17,11 @@ limitations under the License.
 package hostpath
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
 	"github.com/golang/protobuf/ptypes/wrappers"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -35,6 +35,7 @@ const (
 )
 
 type hostPathController struct {
+	csi.UnimplementedControllerServer
 	cfg *Config
 }
 
@@ -90,7 +91,7 @@ func (hpc *hostPathController) validateCreateVolumeRequestTopology(req *csi.Crea
 
 func (hpc *hostPathController) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (resp *csi.CreateVolumeResponse, finalErr error) {
 	if req != nil {
-		klog.V(3).Infof("Create Volume Request: %+v", *req)
+		klog.V(3).Infof("Create Volume Request: %+v", req)
 	}
 
 	if err := hpc.validateCreateVolumeRequest(req); err != nil {

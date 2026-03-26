@@ -377,13 +377,9 @@ func TestNodeSelector(t *testing.T) {
 
 	origWorkload := cr.Spec.Workload.DeepCopy()
 	defer func() {
-		cr, err = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Get(context.TODO(), "hostpath-provisioner", metav1.GetOptions{})
-		Expect(err).ToNot(HaveOccurred())
-
-		cr.Spec.Workload = *origWorkload.DeepCopy()
-
-		_, err = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Update(context.TODO(), cr, metav1.UpdateOptions{})
-		Expect(err).ToNot(HaveOccurred())
+		updateHPPWithRetry(hppClient, "hostpath-provisioner", func(hpp *hostpathprovisioner.HostPathProvisioner) {
+			hpp.Spec.Workload = *origWorkload.DeepCopy()
+		})
 
 		Eventually(func() bool {
 			ds, err := k8sClient.AppsV1().DaemonSets("hostpath-provisioner").Get(context.TODO(), dsCsiName, metav1.GetOptions{})
@@ -401,14 +397,13 @@ func TestNodeSelector(t *testing.T) {
 		}, 270*time.Second, 1*time.Second).Should(BeTrue())
 	}()
 
-	cr.Spec.Workload = hostpathprovisioner.NodePlacement{
-		NodeSelector: nodeSelectorTestValue,
-		Affinity:     affinityTestValue,
-		Tolerations:  tolerationsTestValue,
-	}
-
-	_, err = hppClient.HostpathprovisionerV1beta1().HostPathProvisioners().Update(context.TODO(), cr, metav1.UpdateOptions{})
-	Expect(err).ToNot(HaveOccurred())
+	updateHPPWithRetry(hppClient, "hostpath-provisioner", func(hpp *hostpathprovisioner.HostPathProvisioner) {
+		hpp.Spec.Workload = hostpathprovisioner.NodePlacement{
+			NodeSelector: nodeSelectorTestValue,
+			Affinity:     affinityTestValue,
+			Tolerations:  tolerationsTestValue,
+		}
+	})
 
 	Eventually(func() bool {
 		ds, err := k8sClient.AppsV1().DaemonSets("hostpath-provisioner").Get(context.TODO(), dsCsiName, metav1.GetOptions{})
