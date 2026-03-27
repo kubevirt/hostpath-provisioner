@@ -20,8 +20,6 @@ package v1beta1
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
 	"time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +27,6 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	v1beta1 "kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1"
-	hostpathprovisionerv1beta1 "kubevirt.io/hostpath-provisioner-operator/pkg/client/applyconfiguration/hostpathprovisioner/v1beta1"
 	scheme "kubevirt.io/hostpath-provisioner-operator/pkg/client/clientset/versioned/scheme"
 )
 
@@ -50,8 +47,6 @@ type HostPathProvisionerInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.HostPathProvisionerList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.HostPathProvisioner, err error)
-	Apply(ctx context.Context, hostPathProvisioner *hostpathprovisionerv1beta1.HostPathProvisionerApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.HostPathProvisioner, err error)
-	ApplyStatus(ctx context.Context, hostPathProvisioner *hostpathprovisionerv1beta1.HostPathProvisionerApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.HostPathProvisioner, err error)
 	HostPathProvisionerExpansion
 }
 
@@ -182,60 +177,6 @@ func (c *hostPathProvisioners) Patch(ctx context.Context, name string, pt types.
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied hostPathProvisioner.
-func (c *hostPathProvisioners) Apply(ctx context.Context, hostPathProvisioner *hostpathprovisionerv1beta1.HostPathProvisionerApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.HostPathProvisioner, err error) {
-	if hostPathProvisioner == nil {
-		return nil, fmt.Errorf("hostPathProvisioner provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(hostPathProvisioner)
-	if err != nil {
-		return nil, err
-	}
-	name := hostPathProvisioner.Name
-	if name == nil {
-		return nil, fmt.Errorf("hostPathProvisioner.Name must be provided to Apply")
-	}
-	result = &v1beta1.HostPathProvisioner{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Resource("hostpathprovisioners").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *hostPathProvisioners) ApplyStatus(ctx context.Context, hostPathProvisioner *hostpathprovisionerv1beta1.HostPathProvisionerApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.HostPathProvisioner, err error) {
-	if hostPathProvisioner == nil {
-		return nil, fmt.Errorf("hostPathProvisioner provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(hostPathProvisioner)
-	if err != nil {
-		return nil, err
-	}
-
-	name := hostPathProvisioner.Name
-	if name == nil {
-		return nil, fmt.Errorf("hostPathProvisioner.Name must be provided to Apply")
-	}
-
-	result = &v1beta1.HostPathProvisioner{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Resource("hostpathprovisioners").
-		Name(*name).
-		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
