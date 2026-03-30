@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/container-storage-interface/spec v1.12.0
 	github.com/golang/protobuf v1.5.4
-	github.com/kubernetes-csi/csi-lib-utils v0.16.0
+	github.com/kubernetes-csi/csi-lib-utils v0.23.2
 	github.com/kubernetes-csi/csi-test/v4 v4.4.0
 	github.com/kubevirt/monitoring/pkg/metrics/parser v0.0.0-20230710120526-cc1644c90b64
 	github.com/onsi/gomega v1.38.2
