@@ -1,0 +1,23 @@
+StorageClass:
+  FromName: false
+  FromExistingClassName: hpp-overlay
+SnapshotClass:
+  FromName: false
+  FromExistingClassName: csi-hostpath-snapclass
+DriverInfo:
+  Name: kubevirt.io.hostpath-provisioner
+  Capabilities:
+    block: false
+    controllerExpansion: false
+    exec: true
+    fsGroup: true
+    multipods: true
+    nodeExpansion: false
+    persistence: true
+    singleNodeVolume: false
+    RWX: true
+    snapshotDataSource: true
+    topology: false
+    capacity: true
+InlineVolumes:
+- shared: true

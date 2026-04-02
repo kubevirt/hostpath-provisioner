@@ -98,6 +98,7 @@ func (r *Reflink) GetSnapshotById(snapshotId string) (*csi.Snapshot, error) {
 		SnapshotId:     snapshotId,
 		SourceVolumeId: string(sourceVolumeId),
 		CreationTime:   timestamppb.New(time.Unix(int64(st.Ctim.Sec), int64(st.Ctim.Nsec))),
+		ReadyToUse:     true,
 	}, nil
 }
 

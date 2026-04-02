@@ -17,6 +17,10 @@ source ./cluster-up/hack/common.sh
 source ./cluster-up/cluster/${KUBEVIRT_PROVIDER}/provider.sh
 
 export KUBEVIRT_NUM_NODES=2
+if [ "${HPP_CR_TYPE}" == "overlay-csi" ]; then
+  export KUBEVIRT_DEPLOY_NFS_CSI=true
+  export KUBEVIRT_NFS_DIR=/var/lib/containers/nfs-data
+fi
 make cluster-down
 make cluster-up
 
@@ -58,6 +62,8 @@ if [[ ${registry} == localhost* ]]; then
 fi
 DOCKER_REPO=${registry} make manifest manifest-push
 
+TEST_DRIVER=./hack/test-driver.yaml
+
 #install hpp
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/namespace.yaml
 _kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.6.1/cert-manager.yaml
@@ -75,7 +81,21 @@ _kubectl get pods -n hostpath-provisioner
 _kubectl patch deployment hostpath-provisioner-operator -n hostpath-provisioner --patch-file cluster-sync/patch.yaml
 _kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=120s
 _kubectl wait --for=condition=available deployment -n hostpath-provisioner hostpath-provisioner-operator
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/hostpathprovisioner_legacy_cr.yaml
+if [ "${HPP_CR_TYPE}" == "overlay-csi" ]; then
+  # deploy snapshot CRDs and controller
+  _kubectl apply -f deploy/snapshot/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
+  _kubectl apply -f deploy/snapshot/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
+  _kubectl apply -f deploy/snapshot/snapshot.storage.k8s.io_volumesnapshots.yaml
+  _kubectl apply -f deploy/snapshot/rbac-snapshot-controller.yaml
+  _kubectl apply -f deploy/snapshot/setup-snapshot-controller.yaml
+
+  # deploy custom hpp cr and volumesnapshot class that enables overlay-csi and snapshot/restore
+  _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/hostpathprovisioner_overlay_csi_cr.yaml
+  _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/volumesnapshotclass.yaml
+  TEST_DRIVER=./hack/test-driver-overlay.yaml
+else 
+  _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/hostpathprovisioner_legacy_cr.yaml
+fi
 _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-legacy-csi.yaml
 #Wait for hpp to be available.
 _kubectl wait hostpathprovisioners.hostpathprovisioner.kubevirt.io/hostpath-provisioner --for=condition=Available --timeout=480s
@@ -92,5 +112,9 @@ echo "Downloading test for version $k8s_version"
 curl --location https://dl.k8s.io/${k8s_version}/kubernetes-test-linux-amd64.tar.gz |   tar --strip-components=3 -zxf - kubernetes/test/bin/e2e.test kubernetes/test/bin/ginkgo
 #Run test
 # Some of these tests assume immediate binding, which is a random node, however if multiple volumes are involved sometimes they end up on different nodes and the test fails. Excluding that test.
-./e2e.test -ginkgo.v -ginkgo.focus='External.Storage.*kubevirt.io.hostpath-provisioner' -ginkgo.skip='immediate binding|External.Storage.*should access to two volumes with the same volume mode and retain data across pod recreation on the same node \[LinuxOnly\]' -storage.testdriver=./hack/test-driver.yaml -provider=local
+SKIP_TESTS='immediate binding|External.Storage.*should access to two volumes with the same volume mode and retain data across pod recreation on the same node \[LinuxOnly\]'
+if [ "${HPP_CR_TYPE}" == "overlay-csi" ]; then
+  SKIP_TESTS="${SKIP_TESTS}|should provision correct filesystem size when restoring snapshot to larger size pvc"
+fi
+./e2e.test -ginkgo.v -ginkgo.focus='External.Storage.*kubevirt.io.hostpath-provisioner' -ginkgo.skip="${SKIP_TESTS}" -storage.testdriver="${TEST_DRIVER}" -provider=local
 
