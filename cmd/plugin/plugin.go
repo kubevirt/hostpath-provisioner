@@ -32,6 +32,9 @@ func main() {
 	defer klog.Flush()
 	cfg := &hostpath.Config{}
 	var dataDir string
+	var metricsCertFile string
+	var metricsKeyFile string
+	var metricsTLSVersion string
 	klog.InitFlags(nil)
 	flag.Set("logtostderr", "true")
 	flag.StringVar(&cfg.Endpoint, "endpoint", "unix://tmp/csi.sock", "CSI endpoint")
@@ -39,10 +42,13 @@ func main() {
 	flag.StringVar(&dataDir, "datadir", "[{\"name\":\"legacy\",\"path\":\"/csi-data-dir\",\"snapshotPath\":\"/snap-dir\", \"snapshotProvider\":\"reflink\"}]", "storage pool array with each entry including, storage pool name, directory path, and optional snapshot directory path and snapshot provider, all of this in JSON format. Example: [{\"name\":\"legacy\",\"path\":\"/csi-data-dir\",\"snapshotPath\":\"/snap-dir\",\"snapshotProvider\":\"reflink\"}]")
 	flag.StringVar(&cfg.NodeID, "nodeid", "", "node id")
 	flag.StringVar(&cfg.Version, "version", "", "version of the plugin")
+	flag.StringVar(&metricsCertFile, "metrics-cert-file", "", "path to TLS certificate file for metrics server (optional, will use self-signed cert if not provided). Note: self-signed certs only include localhost+127.0.0.1 by default; set POD_IP (most important), POD_NAMESPACE, and SERVICE_NAME env vars for in-cluster SANs needed for certificate verification")
+	flag.StringVar(&metricsKeyFile, "metrics-key-file", "", "path to TLS key file for metrics server (optional, will use self-signed cert if not provided)")
+	flag.StringVar(&metricsTLSVersion, "metrics-tls-version", "VersionTLS13", "minimum TLS version for metrics server (VersionTLS10, VersionTLS11, VersionTLS12, or VersionTLS13)")
 	flag.Parse()
 
 	klog.V(1).Info("Starting Prometheus metrics endpoint server")
-	hostpath.RunPrometheusServer(":8080")
+	hostpath.RunPrometheusServer(":8443", metricsCertFile, metricsKeyFile, metricsTLSVersion)
 
 	klog.V(1).Infof("Starting new HostPathDriver, config: %v", *cfg)
 	ctx := signals.SetupSignalHandler()

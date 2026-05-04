@@ -16,6 +16,7 @@ limitations under the License.
 package hostpath
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -170,22 +171,85 @@ func getStoragePoolDataDirectories(storagePoolInfo map[string]StoragePoolInfo) (
 	return directories, nil
 }
 
-// RunPrometheusServer runs a prometheus server for metrics
-func RunPrometheusServer(metricsAddr string) {
+// getTLSVersion converts a version string to a tls.Version constant.
+// Supported versions: VersionTLS10, VersionTLS11, VersionTLS12, VersionTLS13.
+// Returns nil if the version string is not recognized.
+func getTLSVersion(versionName string) *uint16 {
+	var versions = map[string]uint16{
+		"VersionTLS10": tls.VersionTLS10,
+		"VersionTLS11": tls.VersionTLS11,
+		"VersionTLS12": tls.VersionTLS12,
+		"VersionTLS13": tls.VersionTLS13,
+	}
+	if version, ok := versions[versionName]; ok {
+		return &version
+	}
+
+	return nil
+}
+
+// RunPrometheusServer runs a prometheus server for metrics with TLS support.
+// If certFile and keyFile are provided, they will be used for TLS.
+// Otherwise, a self-signed certificate will be generated automatically.
+// tlsVersion should be "VersionTLS10", "VersionTLS11", "VersionTLS12", or "VersionTLS13" (default: "VersionTLS13").
+func RunPrometheusServer(metricsAddr, certFile, keyFile, tlsVersion string) {
 	err := metrics.SetupMetrics()
 	if err != nil {
 		klog.Error(err, "Failed to Setup Prometheus metrics")
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
-	server := http.Server{
+
+	server := &http.Server{
 		Addr:    metricsAddr,
 		Handler: mux,
 	}
 
-	go func() {
-		err := server.ListenAndServe()
+	// Validate certificate configuration
+	certProvided := certFile != ""
+	keyProvided := keyFile != ""
+	if certProvided != keyProvided {
+		klog.Warningf("Partial TLS certificate configuration: cert=%q, key=%q. Both --metrics-cert-file and --metrics-key-file must be provided together. Falling back to self-signed certificate.", certFile, keyFile)
+	}
+
+	// Parse TLS version (maps string name to crypto/tls MinVersion constant)
+	minTLSVersion := getTLSVersion(tlsVersion)
+	if minTLSVersion == nil {
+		klog.Warningf("Invalid TLS version '%s', defaulting to TLS 1.3", tlsVersion)
+		defaultVersion := uint16(tls.VersionTLS13)
+		minTLSVersion = &defaultVersion
+	}
+
+	// Configure TLS
+	tlsConfig := &tls.Config{
+		MinVersion: *minTLSVersion,
+	}
+
+	// If cert and key files are provided, use them
+	if certProvided && keyProvided {
+		klog.V(1).Infof("Using provided certificates for metrics server: cert=%s, key=%s", certFile, keyFile)
+		server.TLSConfig = tlsConfig
+	} else {
+		// Generate self-signed certificate
+		klog.V(1).Info("Generating self-signed certificate for metrics server")
+		cert, err := generateSelfSignedCert()
 		if err != nil {
+			klog.Error(err, "Failed to generate self-signed certificate for metrics server")
+			return
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+		server.TLSConfig = tlsConfig
+	}
+
+	go func() {
+		var err error
+		if certProvided && keyProvided {
+			err = server.ListenAndServeTLS(certFile, keyFile)
+		} else {
+			// Use the self-signed cert from TLSConfig
+			err = server.ListenAndServeTLS("", "")
+		}
+		if err != nil && err != http.ErrServerClosed {
 			klog.Error(err, "Failed to start Prometheus metrics endpoint server")
 		}
 	}()
