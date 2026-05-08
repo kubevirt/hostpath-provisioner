@@ -313,7 +313,7 @@ func createPodUsingPVCWithCommand(namespace, name string, pvc *corev1.Persistent
 			Containers: []corev1.Container{
 				{
 					Name:    "runner",
-					Image:   "quay.io/kubevirt/cdi-importer:latest",
+					Image:   "quay.io/kubevirt/cdi-importer:latest-amd64",
 					Command: []string{"/bin/sh", "-c", command},
 					VolumeMounts: []v1.VolumeMount{
 						{
