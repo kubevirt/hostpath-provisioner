@@ -20,9 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -33,36 +31,28 @@ const (
 
 // SetupWebhookWithManager configures the webhook for the passed in manager
 func (r *HostPathProvisioner) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).WithValidator(&HostPathProvisionerValidator{}).
+	return ctrl.NewWebhookManagedBy(mgr, r).
+		WithValidator(&HostPathProvisionerValidator{}).
 		Complete()
 }
 
 type HostPathProvisionerValidator struct {
 }
 
-var _ webhook.CustomValidator = &HostPathProvisionerValidator{}
+var _ admission.Validator[*HostPathProvisioner] = &HostPathProvisionerValidator{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (v *HostPathProvisionerValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
-	hpp, ok := obj.(*HostPathProvisioner)
-	if !ok {
-		return nil, fmt.Errorf("obj is not a HostPathProvisioner")
-	}
-	return v.validatePathConfigAndStoragePools(hpp)
+func (v *HostPathProvisionerValidator) ValidateCreate(ctx context.Context, obj *HostPathProvisioner) (warnings admission.Warnings, err error) {
+	return v.validatePathConfigAndStoragePools(obj)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (v *HostPathProvisionerValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (warnings admission.Warnings, err error) {
-	hpp, ok := newObj.(*HostPathProvisioner)
-	if !ok {
-		return nil, fmt.Errorf("newObj is not a HostPathProvisioner")
-	}
-	return v.validatePathConfigAndStoragePools(hpp)
+func (v *HostPathProvisionerValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *HostPathProvisioner) (warnings admission.Warnings, err error) {
+	return v.validatePathConfigAndStoragePools(newObj)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (v *HostPathProvisionerValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
+func (v *HostPathProvisionerValidator) ValidateDelete(ctx context.Context, obj *HostPathProvisioner) (warnings admission.Warnings, err error) {
 	return nil, nil
 }
 
