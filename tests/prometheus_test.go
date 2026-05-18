@@ -157,6 +157,16 @@ func TestPrometheusAlerts(t *testing.T) {
 		testPrometheusRule(token, hppCRReadyQueryName, promRuleCRReady)
 	})
 
+	t.Run("HPPSharingPoolPathWithOS", func(t *testing.T) {
+		backingStorage := os.Getenv("KUBEVIRT_STORAGE")
+		hppCrType := os.Getenv("HPP_CR_TYPE")
+		if backingStorage == "rook-ceph-default" && hppCrType == "storagepool-pvc-template" {
+			t.Skip("HPP pool is not shared with OS in this CI config")
+		}
+
+		testPrometheusAlert("HPPSharingPoolPathWithOS", token, t)
+	})
+
 	_ = scaleOperatorUp(k8sClient)
 	updateHPPWithRetry(hppClient, "hostpath-provisioner", func(hpp *hostpathprovisionerv1.HostPathProvisioner) {
 		hpp.Spec = *oldSpec
