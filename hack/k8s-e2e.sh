@@ -44,7 +44,7 @@ then
   ssh_port=$(./cluster-up/cli.sh ports ssh)
   echo "ssh port: ${ssh_port}"
   #Start sshuttle
-  sshuttle -r vagrant@127.0.0.1:${ssh_port} 192.168.66.0/24 -e 'ssh -o StrictHostKeyChecking=no -i ./vagrant.key'&
+  sshuttle -r cloud-user@127.0.0.1:${ssh_port} 192.168.66.0/24 -e 'ssh -o StrictHostKeyChecking=no -i ./vagrant.key'&
   SSHUTTLE_PID=$!
   function finish() {
     echo "TERMINATING SSHUTTLE!!!!"
@@ -103,7 +103,7 @@ _kubectl wait hostpathprovisioners.hostpathprovisioner.kubevirt.io/hostpath-prov
 _kubectl get sc hostpath-csi -o yaml
 
 export KUBE_SSH_KEY_PATH=./vagrant.key
-export KUBE_SSH_USER=vagrant
+export KUBE_SSH_USER=cloud-user
 
 echo "KUBE_SSH_USER=${KUBE_SSH_USER}, KEY_FILE=${KUBE_SSH_KEY_PATH}"
 k8s_version=$(_kubectl version -o json | jq ".serverVersion.gitVersion" -r)
