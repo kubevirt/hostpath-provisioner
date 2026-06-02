@@ -20,19 +20,16 @@ set -exuo pipefail
 
 SCRIPT_PATH=$(dirname "$(realpath "$0")")
 
-kubevirtci_path="$(realpath "${SCRIPT_PATH}/../../..")/"
-PROVIDER_PATH="${kubevirtci_path}/cluster-up/cluster/${KUBEVIRT_PROVIDER}"
+KUBEVIRTCI_PATH="$(realpath "${SCRIPT_PATH}/../../..")/"
+PROVIDER_PATH="${KUBEVIRTCI_PATH}/cluster-up/cluster/${KUBEVIRT_PROVIDER}"
 
 RUN_KUBEVIRT_CONFORMANCE=${RUN_KUBEVIRT_CONFORMANCE:-"false"}
 
-function detect_cri() {
-    if podman ps >/dev/null 2>&1; then echo podman; elif docker ps >/dev/null 2>&1; then echo docker; fi
-}
-
+source "${KUBEVIRTCI_PATH}/hack/detect_cri.sh"
 export CRI_BIN=${CRI_BIN:-$(detect_cri)}
 
 (
-  cd $kubevirtci_path
+  cd "$KUBEVIRTCI_PATH"
   kubectl="./cluster-up/kubectl.sh"
   echo "Wait for pods to be ready.."
   timeout 5m bash -c "until ${kubectl} wait --for=condition=Ready pod --timeout=30s --all  -A; do sleep 1; done"
@@ -40,7 +37,7 @@ export CRI_BIN=${CRI_BIN:-$(detect_cri)}
   ${kubectl} get nodes
   ${kubectl} get pods -A
   echo ""
-  
+
   nodes=$(${kubectl} get nodes --no-headers | awk '{print $1}')
   for node in $nodes; do
     node_exec="${CRI_BIN} exec ${node}"
@@ -65,14 +62,19 @@ export CRI_BIN=${CRI_BIN:-$(detect_cri)}
     echo "Deploy latest nighly build Kubevirt"
     if [ "$(kubectl get kubevirts -n kubevirt kubevirt -ojsonpath='{.status.phase}')" != "Deployed" ]; then
       ${kubectl} apply -f "${nightly_build_base_url}/${latest}/kubevirt-operator.yaml"
-      ${kubectl} apply -f "${nightly_build_base_url}/${latest}/kubevirt-cr.yaml"
+
+      curl -sL "${nightly_build_base_url}/${latest}/kubevirt-cr.yaml" -o /tmp/kubevirt-cr.yaml
+      if [[ "$KUBEVIRT_PROVIDER" =~ "sriov" ]]; then
+        # SR-IOV requires CPUManager and ExternalNetResourceInjection feature gates
+        ${kubectl} patch --local -f /tmp/kubevirt-cr.yaml --type=merge -p '{}' -o json \
+          | jq '.spec.configuration.developerConfiguration.featureGates |= ((. // []) + ["CPUManager","ExternalNetResourceInjection"] | unique)' \
+          > /tmp/kubevirt-cr-patched.json
+        ${kubectl} apply -f /tmp/kubevirt-cr-patched.json
+      else
+        ${kubectl} apply -f /tmp/kubevirt-cr.yaml
+      fi
     fi
     ${kubectl} wait -n kubevirt kv kubevirt --for condition=Available --timeout 15m
-
-    if [[ "$KUBEVIRT_PROVIDER" =~ "sriov" ]]; then
-      # Some SR-IOV tests require Kubevirt CPUManager feature
-      ${kubectl} patch kubevirts -n kubevirt kubevirt --type=json -p='[{"op": "replace", "path": "/spec/configuration/developerConfiguration/featureGates","value": ["CPUManager"]}]'
-    fi
 
     echo "Run latest nighly build Kubevirt conformance tests"
     kubevirt_plugin="--plugin ${nightly_build_base_url}/${latest}/conformance.yaml"
@@ -82,7 +84,7 @@ export CRI_BIN=${CRI_BIN:-$(detect_cri)}
     commit="${commit:0:10}"
     container_tag="--plugin-env kubevirt-conformance.CONTAINER_TAG=${latest}_${commit}"
     SONOBUOY_EXTRA_ARGS="${SONOBUOY_EXTRA_ARGS} ${container_tag}"
-    
+
     hack/conformance.sh ${PROVIDER_PATH}/conformance.json
-  fi 
+  fi
 )
