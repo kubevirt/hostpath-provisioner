@@ -64,13 +64,16 @@ DOCKER_REPO=${registry} make manifest manifest-push
 
 TEST_DRIVER=./hack/test-driver.yaml
 
+OPERATOR_URL=$(resolve_operator_url)
+echo "Using operator URL: ${OPERATOR_URL}"
+
 #install hpp
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/namespace.yaml
+_kubectl apply -f ${OPERATOR_URL}/namespace.yaml
 _kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.6.1/cert-manager.yaml
 _kubectl wait --for=condition=available -n cert-manager --timeout=120s --all deployments
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/webhook.yaml -n hostpath-provisioner
+_kubectl apply -f ${OPERATOR_URL}/webhook.yaml -n hostpath-provisioner
 echo "Deploying"
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/operator.yaml -n hostpath-provisioner
+_kubectl apply -f ${OPERATOR_URL}/operator.yaml -n hostpath-provisioner
 
 echo "Waiting for it to be ready"
 _kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=120s
@@ -90,13 +93,13 @@ if [ "${HPP_CR_TYPE}" == "overlay-csi" ]; then
   _kubectl apply -f deploy/snapshot/setup-snapshot-controller.yaml
 
   # deploy custom hpp cr and volumesnapshot class that enables overlay-csi and snapshot/restore
-  _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/hostpathprovisioner_overlay_csi_cr.yaml
-  _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/volumesnapshotclass.yaml
+  _kubectl apply -f ${OPERATOR_URL}/hostpathprovisioner_overlay_csi_cr.yaml
+  _kubectl apply -f ${OPERATOR_URL}/volumesnapshotclass.yaml
   TEST_DRIVER=./hack/test-driver-overlay.yaml
-else 
-  _kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/hostpathprovisioner_legacy_cr.yaml
+else
+  _kubectl apply -f ${OPERATOR_URL}/hostpathprovisioner_legacy_cr.yaml
 fi
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-legacy-csi.yaml
+_kubectl apply -f ${OPERATOR_URL}/storageclass-wffc-legacy-csi.yaml
 #Wait for hpp to be available.
 _kubectl wait hostpathprovisioners.hostpathprovisioner.kubevirt.io/hostpath-provisioner --for=condition=Available --timeout=480s
 
