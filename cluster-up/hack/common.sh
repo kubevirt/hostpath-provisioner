@@ -16,6 +16,31 @@ if [ -z "$KUBEVIRTCI_CONFIG_PATH" ]; then
 fi
 export KUBEVIRTCI_CONFIG_PATH
 
+# operator image tags are only set in the release dowload manifest
+OPERATOR_REPO="https://github.com/kubevirt/hostpath-provisioner-operator"
+
+function resolve_operator_url() {
+    if [ -n "${OPERATOR_VERSION}" ]; then
+        echo "${OPERATOR_REPO}/releases/download/${OPERATOR_VERSION}"
+        return
+    fi
+    # PULL_BASE_REF is set for prow jobs, get correct tag if targetting release branch
+    if [ -n "${PULL_BASE_REF}" ] && [[ "${PULL_BASE_REF}" == release-* ]]; then
+        local tag=$(git describe --tags --abbrev=0 2>/dev/null)
+        if [ -z "${tag}" ]; then
+        echo "ERROR: on release branch but no git tags found" >&2
+        exit 1
+        fi
+        echo "${OPERATOR_REPO}/releases/download/${tag}"
+        return
+    fi
+    # for local enviornments or when prow is targetting main, fall back to using main
+    # NOTE: if you are working off a release branch, this could cause issues
+    # instead you should explicitly set the OPERATOR_VERSION
+    echo "https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy"
+}
+
+
 
 KUBEVIRTCI_CLUSTER_PATH=${KUBEVIRTCI_CLUSTER_PATH:-${KUBEVIRTCI_PATH}/cluster}
 KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER:-k8s-1.34}

@@ -68,14 +68,17 @@ EOF
 
 fi
 
+OPERATOR_URL=$(resolve_operator_url)
+echo "Using operator URL: ${OPERATOR_URL}"
+
 if [ ${HPP_NAMESPACE} == "hostpath-provisioner" ]; then
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/namespace.yaml
+_kubectl apply -f ${OPERATOR_URL}/namespace.yaml
 fi
 _kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.6.1/cert-manager.yaml
 _kubectl wait --for=condition=available -n cert-manager --timeout=120s --all deployments
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/webhook.yaml -n hostpath-provisioner
+_kubectl apply -f ${OPERATOR_URL}/webhook.yaml -n hostpath-provisioner
 echo "Deploying"
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/operator.yaml -n ${HPP_NAMESPACE}
+_kubectl apply -f ${OPERATOR_URL}/operator.yaml -n ${HPP_NAMESPACE}
 
 echo "Waiting for it to be ready"
 _kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=120s
@@ -86,14 +89,14 @@ _kubectl get pods -n hostpath-provisioner
 _kubectl patch deployment hostpath-provisioner-operator -n hostpath-provisioner --patch-file cluster-sync/patch.yaml
 
 _kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=120s
-HPP_CR_PATH="https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/hostpathprovisioner_legacy_cr.yaml"
-HPP_CSI_SC="https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-legacy-csi.yaml"
+HPP_CR_PATH="${OPERATOR_URL}/hostpathprovisioner_legacy_cr.yaml"
+HPP_CSI_SC="${OPERATOR_URL}/storageclass-wffc-legacy-csi.yaml"
 if [ "${KUBEVIRT_STORAGE}" == "rook-ceph-default" ] && [ "${HPP_CR_TYPE}" == "storagepool-pvc-template" ]; then
   HPP_CR_PATH="deploy/tests/hostpathprovisioner_ceph_pvc_pool_cr.yaml"
   HPP_CSI_SC="deploy/tests/storageclass_wffc_ceph_pool.yaml"
 fi
 _kubectl apply -f $HPP_CR_PATH
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-legacy.yaml
+_kubectl apply -f ${OPERATOR_URL}/storageclass-wffc-legacy.yaml
 _kubectl apply -f $HPP_CSI_SC
 
 cat <<EOF | _kubectl apply -f -
