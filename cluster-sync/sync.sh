@@ -89,6 +89,10 @@ _kubectl get pods -n hostpath-provisioner
 _kubectl patch deployment hostpath-provisioner-operator -n hostpath-provisioner --patch-file cluster-sync/patch.yaml
 
 _kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=120s
+
+# allow for the webhook server to be ready
+sleep 5
+
 HPP_CR_PATH="${OPERATOR_URL}/hostpathprovisioner_legacy_cr.yaml"
 HPP_CSI_SC="${OPERATOR_URL}/storageclass-wffc-legacy-csi.yaml"
 if [ "${KUBEVIRT_STORAGE}" == "rook-ceph-default" ] && [ "${HPP_CR_TYPE}" == "storagepool-pvc-template" ]; then

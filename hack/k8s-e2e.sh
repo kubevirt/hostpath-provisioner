@@ -78,6 +78,9 @@ _kubectl get pods -n hostpath-provisioner
 _kubectl patch deployment hostpath-provisioner-operator -n hostpath-provisioner --patch-file cluster-sync/patch.yaml
 _kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=120s
 _kubectl wait --for=condition=available deployment -n hostpath-provisioner hostpath-provisioner-operator
+# allow for the webhook server to be ready
+sleep 5
+
 _kubectl apply -f ${OPERATOR_URL}/hostpathprovisioner_legacy_cr.yaml
 _kubectl apply -f ${OPERATOR_URL}/storageclass-wffc-legacy-csi.yaml
 #Wait for hpp to be available.
