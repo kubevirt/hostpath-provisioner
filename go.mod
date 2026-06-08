@@ -69,7 +69,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231106174013-bbf56f31fb17 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -87,7 +87,6 @@ replace (
 	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.4.0
 	k8s.io/client-go => k8s.io/client-go v0.28.3
-
 )
 
 replace github.com/spf13/pflag => github.com/spf13/pflag v1.0.5
