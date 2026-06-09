@@ -54,11 +54,13 @@ image-csi: hostpath-csi-driver
 	buildah build $(BUILDAH_PLATFORM_FLAG) -t $(DOCKER_REPO)/$(HPP_CSI_IMAGE):$(GOARCH) -f Dockerfile.csi .
 
 manifest-controller: image-controller
-	-buildah manifest create $(DOCKER_REPO)/$(HPP_IMAGE):local
+	-buildah manifest rm $(DOCKER_REPO)/$(HPP_IMAGE):local
+	buildah manifest create $(DOCKER_REPO)/$(HPP_IMAGE):local
 	buildah manifest add --arch $(GOARCH) $(DOCKER_REPO)/$(HPP_IMAGE):local containers-storage:$(DOCKER_REPO)/$(HPP_IMAGE):$(GOARCH)
 
 manifest-csi: image-csi
-	-buildah manifest create $(DOCKER_REPO)/$(HPP_CSI_IMAGE):local
+	-buildah manifest rm $(DOCKER_REPO)/$(HPP_CSI_IMAGE):local
+	buildah manifest create $(DOCKER_REPO)/$(HPP_CSI_IMAGE):local
 	buildah manifest add --arch $(GOARCH) $(DOCKER_REPO)/$(HPP_CSI_IMAGE):local containers-storage:$(DOCKER_REPO)/$(HPP_CSI_IMAGE):$(GOARCH)
 
 push-csi:
