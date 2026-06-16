@@ -40,7 +40,7 @@ then
   ssh_port=$(./cluster-up/cli.sh ports ssh)
   echo "ssh port: ${ssh_port}"
   #Start sshuttle
-  sshuttle -r vagrant@127.0.0.1:${ssh_port} 192.168.66.0/24 -e 'ssh -o StrictHostKeyChecking=no -i ./vagrant.key'&
+  sshuttle -r cloud-user@127.0.0.1:${ssh_port} 192.168.66.0/24 -e 'ssh -o StrictHostKeyChecking=no -i ./vagrant.key'&
   SSHUTTLE_PID=$!
   function finish() {
     echo "TERMINATING SSHUTTLE!!!!"
@@ -58,13 +58,16 @@ if [[ ${registry} == localhost* ]]; then
 fi
 DOCKER_REPO=${registry} make manifest manifest-push
 
+OPERATOR_URL=$(resolve_operator_url)
+echo "Using operator URL: ${OPERATOR_URL}"
+
 #install hpp
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/namespace.yaml
+_kubectl apply -f ${OPERATOR_URL}/namespace.yaml
 _kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.6.1/cert-manager.yaml
 _kubectl wait --for=condition=available -n cert-manager --timeout=120s --all deployments
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/webhook.yaml -n hostpath-provisioner
+_kubectl apply -f ${OPERATOR_URL}/webhook.yaml -n hostpath-provisioner
 echo "Deploying"
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/operator.yaml -n hostpath-provisioner
+_kubectl apply -f ${OPERATOR_URL}/operator.yaml -n hostpath-provisioner
 
 echo "Waiting for it to be ready"
 _kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=120s
@@ -75,15 +78,18 @@ _kubectl get pods -n hostpath-provisioner
 _kubectl patch deployment hostpath-provisioner-operator -n hostpath-provisioner --patch-file cluster-sync/patch.yaml
 _kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=120s
 _kubectl wait --for=condition=available deployment -n hostpath-provisioner hostpath-provisioner-operator
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/hostpathprovisioner_legacy_cr.yaml
-_kubectl apply -f https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy/storageclass-wffc-legacy-csi.yaml
+# allow for the webhook server to be ready
+sleep 5
+
+_kubectl apply -f ${OPERATOR_URL}/hostpathprovisioner_legacy_cr.yaml
+_kubectl apply -f ${OPERATOR_URL}/storageclass-wffc-legacy-csi.yaml
 #Wait for hpp to be available.
 _kubectl wait hostpathprovisioners.hostpathprovisioner.kubevirt.io/hostpath-provisioner --for=condition=Available --timeout=480s
 
 _kubectl get sc hostpath-csi -o yaml
 
 export KUBE_SSH_KEY_PATH=./vagrant.key
-export KUBE_SSH_USER=vagrant
+export KUBE_SSH_USER=cloud-user
 
 echo "KUBE_SSH_USER=${KUBE_SSH_USER}, KEY_FILE=${KUBE_SSH_KEY_PATH}"
 k8s_version=$(_kubectl version -o json | jq ".serverVersion.gitVersion" -r)
