@@ -16,13 +16,16 @@
 # Copyright 2024 Red Hat, Inc.
 #
 
-KIND_VERSION=0.19.0
+KIND_VERSION=0.27.0
 export KIND_IMAGE=kindest/node
-export K8S_VERSION=v1.28.0@sha256:dad5a6238c5e41d7cac405fae3b5eda2ad1de6f1190fa8bfc64ff5bb86173213
+export K8S_VERSION=v1.32.2@sha256:f226345927d7e348497136874b6d207e0b32cc52154ad8323129352923a3142f
 
 KIND_PATH=${KIND_PATH:-"${KUBEVIRTCI_CONFIG_PATH}/${KUBEVIRT_PROVIDER}/_kind"}
 CLUSTER_PATH=${CLUSTER_PATH:-"${KUBEVIRTCI_CONFIG_PATH}/${KUBEVIRT_PROVIDER}/_ovnk"}
 CLUSTER_NAME=${KUBEVIRT_PROVIDER}
+
+source "${KUBEVIRTCI_PATH}/../hack/detect_cri.sh"
+export CRI_BIN=${CRI_BIN:-$(detect_cri)}
 
 function calculate_mtu() {
     overlay_overhead=58
@@ -71,9 +74,25 @@ EOF
 function up() {
     cluster::install
     fetch_kind
-    pushd $CLUSTER_PATH/contrib ; ./kind.sh --cluster-name $CLUSTER_NAME --multi-network-enable -mtu $MTU --local-kind-registry --enable-interconnect; popd
+
+    args=""
+    if [[ "$CRI_BIN" == "podman" ]]; then args+="-ep podman"; fi
+
+    pushd $CLUSTER_PATH/contrib
+      ./kind.sh \
+        --cluster-name $CLUSTER_NAME \
+        -mtu $MTU \
+        --local-kind-registry \
+        --enable-interconnect \
+        --multi-network-enable \
+        --network-segmentation-enable \
+        ${args} \
+        ${NULL}
+    popd
+
     cp ~/$CLUSTER_NAME.conf "${KUBEVIRTCI_CONFIG_PATH}/$KUBEVIRT_PROVIDER/.kubeconfig"
     prepare_config
+    echo "cluster is ready"
 }
 
 function down() {
@@ -81,7 +100,7 @@ function down() {
 }
 
 function _kubectl() {
-    export KUBECONFIG=$(./cluster-up/kubeconfig.sh)
+    export KUBECONFIG=$(${KUBEVIRTCI_PATH}/kubeconfig.sh)
     kubectl "$@"
 }
 
