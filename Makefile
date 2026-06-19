@@ -54,13 +54,21 @@ image-csi: hostpath-csi-driver
 	buildah build $(BUILDAH_PLATFORM_FLAG) -t $(DOCKER_REPO)/$(HPP_CSI_IMAGE):$(GOARCH) -f Dockerfile.csi .
 
 manifest-controller: image-controller
-	-buildah manifest rm $(DOCKER_REPO)/$(HPP_IMAGE):local
-	buildah manifest create $(DOCKER_REPO)/$(HPP_IMAGE):local
+	@manifest="$(DOCKER_REPO)/$(HPP_IMAGE):local"; \
+	if ! buildah manifest inspect "$$manifest" >/dev/null 2>&1; then \
+		buildah manifest rm "$$manifest" 2>/dev/null || true; \
+		buildah rmi -f "$$manifest" 2>/dev/null || true; \
+		buildah manifest create "$$manifest"; \
+	fi
 	buildah manifest add --arch $(GOARCH) $(DOCKER_REPO)/$(HPP_IMAGE):local containers-storage:$(DOCKER_REPO)/$(HPP_IMAGE):$(GOARCH)
 
 manifest-csi: image-csi
-	-buildah manifest rm $(DOCKER_REPO)/$(HPP_CSI_IMAGE):local
-	buildah manifest create $(DOCKER_REPO)/$(HPP_CSI_IMAGE):local
+	@manifest="$(DOCKER_REPO)/$(HPP_CSI_IMAGE):local"; \
+	if ! buildah manifest inspect "$$manifest" >/dev/null 2>&1; then \
+		buildah manifest rm "$$manifest" 2>/dev/null || true; \
+		buildah rmi -f "$$manifest" 2>/dev/null || true; \
+		buildah manifest create "$$manifest"; \
+	fi
 	buildah manifest add --arch $(GOARCH) $(DOCKER_REPO)/$(HPP_CSI_IMAGE):local containers-storage:$(DOCKER_REPO)/$(HPP_CSI_IMAGE):$(GOARCH)
 
 push-csi:
@@ -74,7 +82,9 @@ clean: manifest-clean
 
 manifest-clean:
 	-buildah manifest rm $(DOCKER_REPO)/$(HPP_IMAGE):local
+	-buildah rmi -f $(DOCKER_REPO)/$(HPP_IMAGE):local
 	-buildah manifest rm $(DOCKER_REPO)/$(HPP_CSI_IMAGE):local
+	-buildah rmi -f $(DOCKER_REPO)/$(HPP_CSI_IMAGE):local
 
 build: clean hostpath-provisioner hostpath-csi-driver
 
