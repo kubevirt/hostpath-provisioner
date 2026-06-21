@@ -1,0 +1,6 @@
+v0.25.0
+release
+
+v0.25.1
+Allow daemonset metrics to be served over HTTPS
+
