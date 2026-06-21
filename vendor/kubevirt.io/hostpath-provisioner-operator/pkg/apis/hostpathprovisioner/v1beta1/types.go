@@ -64,8 +64,6 @@ type StoragePool struct {
 	PVCTemplate *corev1.PersistentVolumeClaimSpec `json:"pvcTemplate,omitempty" optional:"true"`
 	// the path to use on the host, this is a required field
 	Path string `json:"path" valid:"required"`
-	// the path used to store snapshot volumes
-	SnapshotPath *string `json:"snapshotPath,omitempty" optional:"true"`
 	// SnapshotProvider defines the snapshot type, currently only reflink supported
 	SnapshotProvider *string `json:"snapshotProvider,omitempty" optional:"true"`
 	// OverlayClassName is used to set the name of the overlay storage class

@@ -24,7 +24,7 @@ require (
 	k8s.io/client-go v0.36.0
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
-	kubevirt.io/hostpath-provisioner-operator v0.25.0
+	kubevirt.io/hostpath-provisioner-operator v0.25.1
 	sigs.k8s.io/controller-runtime v0.24.1
 	sigs.k8s.io/sig-storage-lib-external-provisioner/v6 v6.3.0
 )
