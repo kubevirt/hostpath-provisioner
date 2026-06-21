@@ -1,5 +1,6 @@
 FROM registry.fedoraproject.org/fedora-minimal:42
-RUN microdnf install glibc -y
+ARG TARGETARCH
+RUN if [ "${TARGETARCH}" = "amd64" ]; then microdnf install glibc -y; fi
 COPY _out/hostpath-csi-driver /
 ENTRYPOINT ["/hostpath-csi-driver"]
 
