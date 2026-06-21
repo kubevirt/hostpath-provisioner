@@ -48,10 +48,10 @@ manifest: manifest-controller manifest-csi
 manifest-push: push-csi push-controller
 
 image-controller: hostpath-provisioner
-	buildah build $(BUILDAH_PLATFORM_FLAG) -t $(DOCKER_REPO)/$(HPP_IMAGE):$(GOARCH) -f Dockerfile.controller .
+	buildah build $(BUILDAH_PLATFORM_FLAG) --build-arg TARGETARCH=$(GOARCH) -t $(DOCKER_REPO)/$(HPP_IMAGE):$(GOARCH) -f Dockerfile.controller .
 
 image-csi: hostpath-csi-driver
-	buildah build $(BUILDAH_PLATFORM_FLAG) -t $(DOCKER_REPO)/$(HPP_CSI_IMAGE):$(GOARCH) -f Dockerfile.csi .
+	buildah build $(BUILDAH_PLATFORM_FLAG) --build-arg TARGETARCH=$(GOARCH) -t $(DOCKER_REPO)/$(HPP_CSI_IMAGE):$(GOARCH) -f Dockerfile.csi .
 
 manifest-controller: image-controller
 	-buildah manifest create $(DOCKER_REPO)/$(HPP_IMAGE):local
