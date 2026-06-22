@@ -661,8 +661,8 @@ k8s.io/utils v0.0.0-20210802155522-efc7438f0176/go.mod h1:jPW/WVKK9YHAvNhRxK0md/
 k8s.io/utils v0.0.0-20211116205334-6203023598ed/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2 h1:AZYQSJemyQB5eRxqcPky+/7EdBj0xi3g0ZcxxJ7vbWU=
 k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2/go.mod h1:xDxuJ0whA3d0I4mf/C4ppKHxXynQ+fxnkmQH0vTHnuk=
-kubevirt.io/hostpath-provisioner-operator v0.25.1 h1:RWYFfrEOes4gz1CUscBmkmru3xh0YSk5V8F4y+K6c7k=
-kubevirt.io/hostpath-provisioner-operator v0.25.1/go.mod h1:gCljdlq8Fkk2MunVJkDsx5EDmLvyZlCKZ8Mx0VI/Euc=
+kubevirt.io/hostpath-provisioner-operator v0.25.2 h1:zpwqWfYFWk1rZ+GIrqm0h7sO/7XBTdhneqapVEuoFak=
+kubevirt.io/hostpath-provisioner-operator v0.25.2/go.mod h1:gCljdlq8Fkk2MunVJkDsx5EDmLvyZlCKZ8Mx0VI/Euc=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 sigs.k8s.io/controller-runtime v0.24.1 h1:miPEwrmirImAvgME1L9qebGHrOnGJoVmVdtOU9fRfo4=
 sigs.k8s.io/controller-runtime v0.24.1/go.mod h1:vFkfY5fGt5xAC/sKb8IBFKgWPNKG9OUG29dR8Y2wImw=
