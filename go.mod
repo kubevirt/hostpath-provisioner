@@ -9,7 +9,7 @@ require (
 	github.com/kubernetes-csi/csi-test/v4 v4.4.0
 	github.com/kubevirt/monitoring/pkg/metrics/parser v0.0.0-20230710120526-cc1644c90b64
 	github.com/onsi/gomega v1.39.1
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.92.0
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.92.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
 	github.com/rhobs/operator-observability-toolkit v0.0.30
