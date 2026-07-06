@@ -68,7 +68,7 @@ EOF
 
 fi
 
-OPERATOR_URL=$(resolve_operator_url)
+OPERATOR_URL="https://raw.githubusercontent.com/dsanatar/hostpath-provisioner-operator/refs/heads/dummy-branch/deploy"
 echo "Using operator URL: ${OPERATOR_URL}"
 
 if [ ${HPP_NAMESPACE} == "hostpath-provisioner" ]; then
