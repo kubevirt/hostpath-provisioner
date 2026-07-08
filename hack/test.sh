@@ -17,6 +17,12 @@ set -e
 readonly ARTIFACTS_PATH="${ARTIFACTS}"
 export KUBEVIRT_NUM_NODES=2
 export KUBEVIRT_DEPLOY_PROMETHEUS=true
+
+if [ "${HPP_CR_TYPE}" == "overlay-csi" ]; then
+  export KUBEVIRT_DEPLOY_NFS_CSI=true
+  export KUBEVIRT_NFS_DIR=/var/lib/containers/nfs-data
+fi
+
 make cluster-down
 make cluster-up
 
