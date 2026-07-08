@@ -2,7 +2,7 @@ module kubevirt.io/hostpath-provisioner
 
 go 1.22.0
 
-toolchain go1.22.5
+toolchain go1.25.12
 
 require (
 	github.com/container-storage-interface/spec v1.9.0
@@ -88,7 +88,6 @@ replace (
 	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.4.0
 	k8s.io/client-go => k8s.io/client-go v0.28.3
-
 )
 
 replace github.com/spf13/pflag => github.com/spf13/pflag v1.0.5
