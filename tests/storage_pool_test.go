@@ -33,7 +33,6 @@ import (
 
 const (
 	hppNamespace  = "hostpath-provisioner"
-	hppCRName     = "hostpath-provisioner"
 	poolMountName = "pool-volume"
 )
 
@@ -63,6 +62,15 @@ func findNFSOverlayPool(k8sClient *kubernetes.Clientset) *hostpathprovisionerv1.
 		}
 	}
 	return nil
+}
+
+// exec into the mounter pod to retrive total block size of a mount pount
+func getMountSize(mounterPod, mountPath string) string {
+	blockSize, err := RunKubeCtlCommand("exec", "-n", hppNamespace, mounterPod, "-c", "mounter", "--",
+		"/bin/sh", "-c", fmt.Sprintf("df %s | sed 1d | awk '{print $2}'", mountPath))
+	Expect(err).ToNot(HaveOccurred())
+	Expect(blockSize).ToNot(BeEmpty())
+	return blockSize
 }
 
 // TestNFSStoragePoolMounterRecovery verifies that the hpp-pool mounter pod recovers correctly
@@ -162,6 +170,7 @@ func TestNFSStoragePoolMounterRecovery(t *testing.T) {
 
 	// Verify the new mounter pod comes up Running and does not enter CrashLoopBackOff.
 	t.Logf("Waiting for hpp-pool pod on %s to recover", targetNode)
+	newPoolPod := ""
 	Eventually(func() bool {
 		pods, err := k8sClient.CoreV1().Pods(hppNamespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("k8s-app=hostpath-provisioner,kubevirt.io.hostpath-provisioner/storagePool=%s-hpp", pool.Name),
@@ -176,6 +185,7 @@ func TestNFSStoragePoolMounterRecovery(t *testing.T) {
 			}
 			if pod.Status.Phase == corev1.PodRunning {
 				t.Logf("hpp-pool pod %s is Running", pod.Name)
+				newPoolPod = pod.Name
 				return true
 			}
 			// Fail fast if it enters CrashLoopBackOff
@@ -188,6 +198,12 @@ func TestNFSStoragePoolMounterRecovery(t *testing.T) {
 		}
 		return false
 	}, 120*time.Second, 2*time.Second).Should(BeTrue(), "hpp-pool mounter should recover to Running with multiple NFS pod mounts present")
+
+	// Check that the directory bind mounted on the host is the actual nfs share by comparing the total block sizes
+	t.Logf("Verifying bind mount size matches the NFS share")
+	hostMountSize := getMountSize(newPoolPod, fmt.Sprintf("/host/%s/csi", pool.Path))
+	sourceMountSize := getMountSize(newPoolPod, "/source")
+	Expect(hostMountSize).To(Equal(sourceMountSize))
 
 	// Verify the overlay storage class can still provision PVCs after mounter recovery.
 	// This confirms the bind mount at the pool path was correctly re-established.
