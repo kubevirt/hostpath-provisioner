@@ -255,7 +255,7 @@ gomodules.xyz/jsonpatch/v2
 # google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f
 ## explicit; go 1.22
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.70.0 => github.com/openshift-sustaining/grpc-go v1.71.3-sec.1
+# google.golang.org/grpc v1.82.1 => github.com/openshift-sustaining/grpc-go v1.71.3-sec.1
 ## explicit; go 1.22.0
 google.golang.org/grpc
 google.golang.org/grpc/attributes
