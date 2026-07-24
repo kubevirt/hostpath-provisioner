@@ -88,6 +88,9 @@ type promMetric struct {
 func TestPrometheusMetrics(t *testing.T) {
 	k8sClient, _, token := prometheusTestSetup(t)
 
+	hppCrType := os.Getenv("HPP_CR_TYPE")
+	isNFSOverlay := hppCrType == "overlay-csi"
+
 	// Wait for Prometheus to scrape metrics at least once
 	waitForPrometheusMetrics(token)
 
@@ -100,10 +103,9 @@ func TestPrometheusMetrics(t *testing.T) {
 	t.Run("HPP pool sharing path with OS", func(t *testing.T) {
 		promRulePoolShared := "0"
 		backingStorage := os.Getenv("KUBEVIRT_STORAGE")
-		hppCrType := os.Getenv("HPP_CR_TYPE")
 		// Our only CI setup that avoids sharing path with OS
 		// is a backing rook-ceph-block PVC of the HPP storage pool
-		shared := backingStorage != "rook-ceph-default" || hppCrType != "storagepool-pvc-template"
+		shared := backingStorage != "rook-ceph-default" || (hppCrType != "storagepool-pvc-template" && !isNFSOverlay)
 		if shared {
 			promRulePoolShared = "1"
 		}
@@ -160,7 +162,7 @@ func TestPrometheusAlerts(t *testing.T) {
 	t.Run("HPPSharingPoolPathWithOS", func(t *testing.T) {
 		backingStorage := os.Getenv("KUBEVIRT_STORAGE")
 		hppCrType := os.Getenv("HPP_CR_TYPE")
-		if backingStorage == "rook-ceph-default" && hppCrType == "storagepool-pvc-template" {
+		if (backingStorage == "rook-ceph-default" && hppCrType == "storagepool-pvc-template") || hppCrType == "overlay-csi" {
 			t.Skip("HPP pool is not shared with OS in this CI config")
 		}
 
