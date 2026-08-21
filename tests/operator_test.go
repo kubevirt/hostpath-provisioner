@@ -471,3 +471,41 @@ func Test_CSIDriver(t *testing.T) {
 		verifyCsiDriver(k8sClient)
 	})
 }
+
+func TestOperatorSecurityContext(t *testing.T) {
+	RegisterTestingT(t)
+	tearDown, k8sClient := setupTestCase(t)
+	defer tearDown(t)
+
+	t.Run("operator should have readOnlyRootFilesystem", func(t *testing.T) {
+		RegisterTestingT(t)
+		deployment, err := k8sClient.AppsV1().Deployments(namespace).Get(
+			context.TODO(), operatorDeploymentName, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+
+		for _, c := range deployment.Spec.Template.Spec.Containers {
+			Expect(c.SecurityContext).ToNot(BeNil(),
+				"container %s should have SecurityContext", c.Name)
+			Expect(c.SecurityContext.ReadOnlyRootFilesystem).ToNot(BeNil(),
+				"container %s should have ReadOnlyRootFilesystem set", c.Name)
+			Expect(*c.SecurityContext.ReadOnlyRootFilesystem).To(BeTrue(),
+				"container %s should have ReadOnlyRootFilesystem=true", c.Name)
+		}
+	})
+
+	t.Run("CSI privileged containers should NOT have readOnlyRootFilesystem", func(t *testing.T) {
+		RegisterTestingT(t)
+		ds, err := k8sClient.AppsV1().DaemonSets(namespace).Get(
+			context.TODO(), dsCsiName, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+
+		for _, c := range ds.Spec.Template.Spec.Containers {
+			if c.SecurityContext != nil &&
+				c.SecurityContext.Privileged != nil &&
+				*c.SecurityContext.Privileged {
+				Expect(c.SecurityContext.ReadOnlyRootFilesystem).To(BeNil(),
+					"privileged container %s should not set readOnlyRootFilesystem", c.Name)
+			}
+		}
+	})
+}
