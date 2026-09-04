@@ -40,7 +40,35 @@ function resolve_operator_url() {
     echo "https://raw.githubusercontent.com/kubevirt/hostpath-provisioner-operator/main/deploy"
 }
 
+CERT_MANAGER_VERSION=${CERT_MANAGER_VERSION:-v1.21.1}
+CERT_MANAGER_MANIFEST_URL="https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml"
 
+function wait_for_operator_webhook() {
+    local namespace="${1:-hostpath-provisioner}"
+    echo "Waiting for webhook certificate"
+    _kubectl wait --for=condition=Ready \
+        certificate/hostpath-provisioner-operator-webhook-service-cert \
+        -n "${namespace}" --timeout=180s
+}
+
+function retry_kubectl_apply() {
+    local manifest="$1"
+    local max_attempts="${2:-12}"
+    local wait_seconds="${3:-10}"
+    local attempt=1
+
+    while [ "$attempt" -le "$max_attempts" ]; do
+        if _kubectl apply -f "$manifest"; then
+            return 0
+        fi
+        echo "Attempt ${attempt}/${max_attempts} failed applying ${manifest}, retrying in ${wait_seconds}s..."
+        sleep "$wait_seconds"
+        attempt=$((attempt + 1))
+    done
+
+    echo "ERROR: failed to apply ${manifest} after ${max_attempts} attempts"
+    return 1
+}
 
 KUBEVIRTCI_CLUSTER_PATH=${KUBEVIRTCI_CLUSTER_PATH:-${KUBEVIRTCI_PATH}/cluster}
 KUBEVIRT_PROVIDER=${KUBEVIRT_PROVIDER:-k8s-1.34}

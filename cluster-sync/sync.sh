@@ -74,8 +74,8 @@ echo "Using operator URL: ${OPERATOR_URL}"
 if [ ${HPP_NAMESPACE} == "hostpath-provisioner" ]; then
 _kubectl apply -f ${OPERATOR_URL}/namespace.yaml
 fi
-_kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.6.1/cert-manager.yaml
-_kubectl wait --for=condition=available -n cert-manager --timeout=120s --all deployments
+_kubectl apply -f "${CERT_MANAGER_MANIFEST_URL}"
+_kubectl wait --for=condition=available -n cert-manager --timeout=180s --all deployments
 _kubectl apply -f ${OPERATOR_URL}/webhook.yaml -n hostpath-provisioner
 echo "Deploying"
 _kubectl apply -f ${OPERATOR_URL}/operator.yaml -n ${HPP_NAMESPACE}
@@ -90,8 +90,7 @@ _kubectl patch deployment hostpath-provisioner-operator -n hostpath-provisioner 
 
 _kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=120s
 
-# allow for the webhook server to be ready
-sleep 5
+wait_for_operator_webhook
 
 HPP_CR_PATH="${OPERATOR_URL}/hostpathprovisioner_legacy_cr.yaml"
 HPP_CSI_SC="${OPERATOR_URL}/storageclass-wffc-legacy-csi.yaml"
@@ -102,7 +101,7 @@ elif [ "${HPP_CR_TYPE}" == "overlay-csi" ]; then
   HPP_CR_PATH="deploy/tests/hostpathprovisioner_nfs_overlay_cr.yaml"
   HPP_CSI_SC="deploy/tests/storageclass_wffc_nfs_overlay.yaml"
 fi
-_kubectl apply -f $HPP_CR_PATH
+retry_kubectl_apply "$HPP_CR_PATH"
 _kubectl apply -f ${OPERATOR_URL}/storageclass-wffc-legacy.yaml
 _kubectl apply -f $HPP_CSI_SC
 

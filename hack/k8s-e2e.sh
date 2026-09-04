@@ -69,8 +69,8 @@ echo "Using operator URL: ${OPERATOR_URL}"
 
 #install hpp
 _kubectl apply -f ${OPERATOR_URL}/namespace.yaml
-_kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.6.1/cert-manager.yaml
-_kubectl wait --for=condition=available -n cert-manager --timeout=120s --all deployments
+_kubectl apply -f "${CERT_MANAGER_MANIFEST_URL}"
+_kubectl wait --for=condition=available -n cert-manager --timeout=180s --all deployments
 _kubectl apply -f ${OPERATOR_URL}/webhook.yaml -n hostpath-provisioner
 echo "Deploying"
 _kubectl apply -f ${OPERATOR_URL}/operator.yaml -n hostpath-provisioner
@@ -84,6 +84,7 @@ _kubectl get pods -n hostpath-provisioner
 _kubectl patch deployment hostpath-provisioner-operator -n hostpath-provisioner --patch-file cluster-sync/patch.yaml
 _kubectl rollout status -n hostpath-provisioner deployment/hostpath-provisioner-operator --timeout=120s
 _kubectl wait --for=condition=available deployment -n hostpath-provisioner hostpath-provisioner-operator
+wait_for_operator_webhook
 if [ "${HPP_CR_TYPE}" == "overlay-csi" ]; then
   # deploy snapshot CRDs and controller
   _kubectl apply -f deploy/snapshot/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
@@ -93,11 +94,11 @@ if [ "${HPP_CR_TYPE}" == "overlay-csi" ]; then
   _kubectl apply -f deploy/snapshot/setup-snapshot-controller.yaml
 
   # deploy custom hpp cr and volumesnapshot class that enables overlay-csi and snapshot/restore
-  _kubectl apply -f ${OPERATOR_URL}/hostpathprovisioner_overlay_csi_cr.yaml
+  retry_kubectl_apply "${OPERATOR_URL}/hostpathprovisioner_overlay_csi_cr.yaml"
   _kubectl apply -f ${OPERATOR_URL}/volumesnapshotclass.yaml
   TEST_DRIVER=./hack/test-driver-overlay.yaml
 else
-  _kubectl apply -f ${OPERATOR_URL}/hostpathprovisioner_legacy_cr.yaml
+  retry_kubectl_apply "${OPERATOR_URL}/hostpathprovisioner_legacy_cr.yaml"
 fi
 _kubectl apply -f ${OPERATOR_URL}/storageclass-wffc-legacy-csi.yaml
 #Wait for hpp to be available.
