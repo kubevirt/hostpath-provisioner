@@ -68,6 +68,7 @@ EOF
 
 fi
 
+# TEST COMMENT
 OPERATOR_URL=$(resolve_operator_url)
 echo "Using operator URL: ${OPERATOR_URL}"
 
