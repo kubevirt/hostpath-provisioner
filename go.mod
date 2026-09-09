@@ -14,7 +14,7 @@ require (
 	github.com/prometheus/client_model v0.6.3
 	github.com/rhobs/operator-observability-toolkit v0.0.30
 	golang.org/x/net v0.58.0
-	golang.org/x/sys v0.47.0
+	golang.org/x/sys v0.48.0
 	golang.org/x/time v0.16.0
 	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
