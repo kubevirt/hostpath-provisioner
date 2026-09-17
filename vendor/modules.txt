@@ -851,7 +851,7 @@ kubevirt.io/hostpath-provisioner-operator/pkg/apis/hostpathprovisioner/v1beta1
 kubevirt.io/hostpath-provisioner-operator/pkg/client/clientset/versioned
 kubevirt.io/hostpath-provisioner-operator/pkg/client/clientset/versioned/scheme
 kubevirt.io/hostpath-provisioner-operator/pkg/client/clientset/versioned/typed/hostpathprovisioner/v1beta1
-# sigs.k8s.io/controller-runtime v0.25.0
+# sigs.k8s.io/controller-runtime v0.25.1
 ## explicit; go 1.26.0
 sigs.k8s.io/controller-runtime
 sigs.k8s.io/controller-runtime/pkg/builder
