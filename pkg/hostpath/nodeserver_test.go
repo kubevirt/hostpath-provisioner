@@ -399,10 +399,19 @@ func Test_NodePublishVolumeEphemeral(t *testing.T) {
 	nodeServer.cfg.StoragePoolInfo[legacyStoragePoolName] = StoragePoolInfo{
 		Path: tempDir,
 	}
+	origQuota := applyVolumeQuota
+	applyVolumeQuota = func(volPath, volID string, capacityBytes, poolCapacity int64) error {
+		return nil
+	}
+	defer func() { applyVolumeQuota = origQuota }()
+	origRoot := poolOnRootDisk
+	poolOnRootDisk = func(string) bool { return false }
+	defer func() { poolOnRootDisk = origRoot }()
 	_, err = nodeServer.NodePublishVolume(context.TODO(), &csi.NodePublishVolumeRequest{
 		VolumeId: "csi-abcd",
 		VolumeContext: map[string]string{
 			ephemeralContextKey: "true",
+			ephemeralSizeKey:    "1Gi",
 		},
 		TargetPath: filepath.Join(tempDir, validVolId),
 		VolumeCapability: &csi.VolumeCapability{

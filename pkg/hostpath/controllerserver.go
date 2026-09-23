@@ -110,6 +110,30 @@ func (hpc *hostPathController) validateCreateVolumeRequestTopology(req *csi.Crea
 	return nil
 }
 
+func EnforceQuota(volPath, volID string, capacityBytes, poolCapacity int64) error {
+	// TODO: callers must skip this unless the StorageClass parameter enforceQuota is "true".
+	// Missing or any other value means no quota, so existing volumes keep working.
+	// Also skip when this pool's directory is on the root disk (see checkVolumePathSharedWithOS).
+	fsType, err := getFilesystemType(volPath)
+	if err != nil {
+		return fmt.Errorf("failed to detect filesystem type for %s: %w", volPath, err)
+	}
+
+	id, err := assignProjectId(volPath, volID, capacityBytes, poolCapacity)
+	if err != nil {
+		return err
+	}
+
+	switch fsType {
+	case ext4:
+		return setExt4ProjectQuota(volPath, id, capacityBytes)
+	case xfs:
+		return setXfsProjectQuota(volPath, id, capacityBytes)
+	default:
+		return fmt.Errorf("unsupported filesystem %q for quota enforcement", fsType)
+	}
+}
+
 func (hpc *hostPathController) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (resp *csi.CreateVolumeResponse, finalErr error) {
 	if req != nil {
 		klog.V(3).Infof("Create Volume Request: %+v", req)
@@ -123,11 +147,13 @@ func (hpc *hostPathController) CreateVolume(ctx context.Context, req *csi.Create
 		return nil, err
 	}
 
+	hppDirPath := hpc.cfg.StoragePoolInfo[storagePoolName].Path
+
 	storagePoolName := getStoragePoolNameFromMap(req.GetParameters())
 	if _, ok := hpc.cfg.StoragePoolInfo[storagePoolName]; !ok {
 		return nil, fmt.Errorf("unable to locate path for storage pool %s", storagePoolName)
 	}
-	capacity, err := hpc.getVolumeDirCapacity(hpc.cfg.StoragePoolInfo[storagePoolName].Path)
+	capacity, err := hpc.getVolumeDirCapacity(hppDirPath)
 	if err != nil {
 		return nil, err
 	}
@@ -138,13 +164,32 @@ func (hpc *hostPathController) CreateVolume(ctx context.Context, req *csi.Create
 		topologies = append(topologies, &csi.Topology{Segments: map[string]string{TopologyKeyNode: hpc.cfg.NodeID}})
 	}
 
-	if exists, err := checkPathExist(filepath.Join(hpc.cfg.StoragePoolInfo[storagePoolName].Path, req.GetName())); err != nil {
+	if exists, err := checkPathExist(filepath.Join(hppDirPath, req.GetName())); err != nil {
 		return nil, err
 	} else if !exists {
-		if err := CreateVolumeDirectory(hpc.cfg.StoragePoolInfo[storagePoolName].Path, req.GetName()); err != nil {
+		if err := CreateVolumeDirectory(hppDirPath, req.GetName()); err != nil {
 			return nil, fmt.Errorf("failed to create volume %v: %w", req.GetName(), err)
 		}
-		klog.V(4).Infof("created volume %s at path %s", req.GetName(), filepath.Join(hpc.cfg.StoragePoolInfo[storagePoolName].Path, req.GetName()))
+		klog.V(4).Infof("created volume %s at path %s", req.GetName(), filepath.Join(hppDirPath, req.GetName()))
+		// full path of this PVC's dir
+		volPath := filepath.Join(hppDirPath, req.GetName())
+
+		// Opt-in for persistent volumes. Ephemeral volumes are handled in NodePublishVolume.
+		if shouldEnforceQuota(req.GetParameters(), false) {
+			// Pool dir sits on root disk. Quota cannot be set here.
+			if checkVolumePathSharedWithOS(hppDirPath) {
+				// Don't fail PVC Log and create dir with no quota.
+				klog.Warningf("skipping quota for %s: pool %s is on the root disk", req.GetName(), hppDirPath)
+			} else {
+				// This becomes the hard limit.
+				requested := req.GetCapacityRange().GetRequiredBytes()
+				// capacity here is the size of the whole pool, will reject an over-large request.
+				if err := EnforceQuota(volPath, req.GetName(), requested, capacity); err != nil {
+					_ = DeleteVolume(hppDirPath, req.GetName())
+					return nil, err
+				}
+			}
+		}
 	}
 
 	if req.GetVolumeContentSource() != nil {
@@ -153,7 +198,7 @@ func (hpc *hostPathController) CreateVolume(ctx context.Context, req *csi.Create
 		case *csi.VolumeContentSource_Snapshot:
 			if snapshot := source.GetSnapshot(); snapshot != nil {
 				if err := hpc.restoreFromSnapshot(snapshot.GetSnapshotId(), storagePoolName, req.GetName()); err != nil {
-					if err := DeleteVolume(hpc.cfg.StoragePoolInfo[storagePoolName].Path, req.GetName()); err != nil {
+					if err := DeleteVolume(hppDirPath, req.GetName()); err != nil {
 						return nil, fmt.Errorf("failed to delete restore %v: %w", req.GetName(), err)
 					}
 					return nil, err
