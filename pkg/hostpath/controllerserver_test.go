@@ -192,7 +192,7 @@ func Test_CreateVolumeValidDoesNotExist(t *testing.T) {
 	_, err = os.Stat(filepath.Join(tempDir, "testname"))
 	Expect(err).ToNot(HaveOccurred())
 	Expect(resp.Volume.VolumeId).To(Equal("testname"))
-	Expect(resp.Volume.CapacityBytes).To(Equal(int64(1000)))
+	Expect(resp.Volume.CapacityBytes).To(Equal(int64(500)))
 	Expect(resp.Volume.VolumeContext).To(BeNil())
 	Expect(resp.Volume.ContentSource).To(BeNil())
 	Expect(len(resp.Volume.AccessibleTopology)).To(Equal(1))
@@ -204,7 +204,7 @@ func Test_CreateVolumeValidDoesNotExist(t *testing.T) {
 	_, err = os.Stat(filepath.Join(tempDir, "testname"))
 	Expect(err).ToNot(HaveOccurred())
 	Expect(resp.Volume.VolumeId).To(Equal("testname"))
-	Expect(resp.Volume.CapacityBytes).To(Equal(int64(1000)))
+	Expect(resp.Volume.CapacityBytes).To(Equal(int64(500)))
 	Expect(resp.Volume.VolumeContext).To(BeNil())
 	Expect(resp.Volume.ContentSource).To(BeNil())
 	Expect(len(resp.Volume.AccessibleTopology)).To(Equal(1))
@@ -1315,7 +1315,8 @@ func Test_ControllerExpandVolume(t *testing.T) {
 
 func createTestRequest() *csi.CreateVolumeRequest {
 	return &csi.CreateVolumeRequest{
-		Name: "testname",
+		Name:          "testname",
+		CapacityRange: &csi.CapacityRange{RequiredBytes: 500},
 		VolumeCapabilities: []*csi.VolumeCapability{
 			{
 				AccessType: &csi.VolumeCapability_Mount{

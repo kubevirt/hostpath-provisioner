@@ -166,3 +166,25 @@ func Test_extractDeviceFromMountInfoSource(t *testing.T) {
 		})
 	}
 }
+
+func TestShouldEnforceQuota(t *testing.T) {
+	RegisterTestingT(t)
+
+	tests := []struct {
+		name   string
+		params map[string]string
+		want   bool
+	}{
+		{name: "explicit true", params: map[string]string{enforceQuotaParam: "true"}, want: true},
+		{name: "explicit false", params: map[string]string{enforceQuotaParam: "false"}, want: false},
+		{name: "missing parameter", params: map[string]string{}, want: false},
+		{name: "unrelated parameters", params: map[string]string{"storagePool": "default"}, want: false},
+		{name: "case sensitive", params: map[string]string{enforceQuotaParam: "True"}, want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			Expect(shouldEnforceQuota(test.params)).To(Equal(test.want))
+		})
+	}
+}

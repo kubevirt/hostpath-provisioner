@@ -39,6 +39,7 @@ const (
 	// The storagePool field name in the storage class arguments.
 	storagePoolName       = "storagePool"
 	legacyStoragePoolName = "legacy"
+	enforceQuotaParam     = "enforceQuota"
 )
 
 var (
@@ -62,6 +63,16 @@ type StoragePoolInfo struct {
 	SnapshotPath     *string               `json:"snapshotPath,omitempty"`
 	SnapshotProvider *SnapshotProviderType `json:"snapshotProvider,omitempty"`
 	Shared           bool                  `json:"shared"`
+}
+
+// shouldEnforceQuota reports whether this volume gets a project quota.
+// Quota enforcement is opt-in for both persistent and ephemeral volumes:
+// only enforceQuota=true enables it.
+func shouldEnforceQuota(params map[string]string) bool {
+	if value, ok := params[enforceQuotaParam]; ok {
+		return value == "true"
+	}
+	return false
 }
 
 // roundDownCapacityPretty Round down the capacity to an easy to read value. Blatantly stolen from here: https://github.com/kubernetes-incubator/external-storage/blob/master/local-volume/provisioner/pkg/discovery/discovery.go#L339
@@ -96,6 +107,7 @@ func createVolumeDirectoryFunc(base, volID string) error {
 	if err != nil {
 		return err
 	}
+
 	klog.V(4).Infof("adding hostpath volume: %s", volID)
 	return nil
 }
@@ -107,6 +119,9 @@ func DeleteVolume(base, volID string) error {
 	klog.V(4).Infof("starting to delete hostpath volume: %s", volID)
 
 	path := filepath.Join(base, volID)
+	if err := removeProjectID(path); err != nil {
+		return err
+	}
 	if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -148,6 +163,9 @@ func checkPathExistFunc(path string) (bool, error) {
 }
 
 func getStoragePoolNameFromMap(params map[string]string) string {
+	// TODO: read enforceQuota the same way. It arrives on CreateVolume as
+	// req.GetParameters()["enforceQuota"] from the StorageClass parameters map.
+	// Opt-in only: treat anything other than "true" as off.
 	if _, ok := params[storagePoolName]; ok {
 		return params[storagePoolName]
 	}
@@ -313,6 +331,8 @@ func evaluateSharedPathMetric(storagePoolDataDir map[string]StoragePoolInfo) {
 		if checkVolumePathSharedWithOS(v.Path) {
 			pathShared = true
 			klog.V(1).Infof("pool (%s, %s), shares path with OS which can lead to node disk pressure", k, v.Path)
+			// TODO: this pool is a directory on the root disk, so quota mount flags cannot be set.
+			// Disable quotas for it and log a warning. Do not fail driver startup.
 		}
 		if v.SnapshotPath != nil {
 			if checkVolumePathSharedWithOS(*v.SnapshotPath) {
