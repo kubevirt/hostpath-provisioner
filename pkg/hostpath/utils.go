@@ -96,6 +96,7 @@ func createVolumeDirectoryFunc(base, volID string) error {
 	if err != nil {
 		return err
 	}
+
 	klog.V(4).Infof("adding hostpath volume: %s", volID)
 	return nil
 }
@@ -107,6 +108,9 @@ func DeleteVolume(base, volID string) error {
 	klog.V(4).Infof("starting to delete hostpath volume: %s", volID)
 
 	path := filepath.Join(base, volID)
+	if err := removeProjectId(path, volID); err != nil {
+		return err
+	}
 	if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
