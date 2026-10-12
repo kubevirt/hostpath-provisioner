@@ -125,6 +125,7 @@ func DeleteVolume(base, volID string) error {
 	if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
+	metrics.DeleteHPPVolumeMetrics(volID)
 	klog.V(4).Infof("deleted hostpath volume: %s", volID)
 	return nil
 }
