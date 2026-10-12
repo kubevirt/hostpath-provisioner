@@ -26,6 +26,7 @@ import (
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"kubevirt.io/hostpath-provisioner/pkg/monitoring/metrics"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -154,6 +155,7 @@ func EnforceQuota(volPath, volID string, capacityBytes, poolCapacity int64) erro
 		return fmt.Errorf("failed to verify project ID for volume %s: got %d, expected %d", volID, actualID, id)
 	}
 
+	metrics.SetHPPVolQuotaBytes(volID, capacityBytes)
 	return nil
 }
 

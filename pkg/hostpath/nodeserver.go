@@ -39,8 +39,9 @@ const (
 
 // Replaced in tests so NodePublishVolume does not run host quota tools.
 var (
-	applyVolumeQuota = EnforceQuota
-	poolOnRootDisk   = checkVolumePathSharedWithOS
+	applyVolumeQuota     = EnforceQuota
+	poolOnRootDisk       = checkVolumePathSharedWithOS
+	getProjectQuotaStats = projectQuotaStatsBytes
 )
 
 type hostPathNode struct {
@@ -378,6 +379,25 @@ func (hpn *hostPathNode) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGe
 		return nil, fmt.Errorf("get volume stats failed: %w", err)
 	}
 
+	// statfs reports the entire backing filesystem. NodeGetVolumeStats does not
+	// carry VolumeContext, so find the backing PVC directory by its ID under the
+	// configured pools. When it has a project quota, report that limit and usage.
+	if volPath, ok := hpn.volumeBackingPath(req.GetVolumeId()); ok &&
+		!poolOnRootDisk(filepath.Dir(volPath)) {
+		quotaUsed, quotaHardLimit, err := getProjectQuotaStats(volPath)
+		if err != nil {
+			return nil, fmt.Errorf("get project quota stats for volume %s: %w", req.GetVolumeId(), err)
+		}
+		if quotaHardLimit > 0 {
+			used = quotaUsed
+			capacity = quotaHardLimit
+			available = quotaHardLimit - quotaUsed
+			if available < 0 {
+				available = 0
+			}
+		}
+	}
+
 	klog.V(3).Infof("Capacity: %+v Used: %+v Available: %+v Inodes: %+v Free inodes: %+v Used inodes: %+v", capacity, used, available, inodes, inodesFree, inodesUsed)
 	return &csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
@@ -398,6 +418,18 @@ func (hpn *hostPathNode) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGe
 			Message:  msg,
 		},
 	}, nil
+}
+
+// volumeBackingPath finds volID under one of this node's configured storage
+// pools. NodeGetVolumeStats only receives the kubelet mount path, not the pool.
+func (hpn *hostPathNode) volumeBackingPath(volID string) (string, bool) {
+	for _, pool := range hpn.cfg.StoragePoolInfo {
+		path := filepath.Join(pool.Path, volID)
+		if _, err := os.Stat(path); err == nil {
+			return path, true
+		}
+	}
+	return "", false
 }
 
 // NodeExpandVolume is only implemented so the driver can be used for e2e testing.
