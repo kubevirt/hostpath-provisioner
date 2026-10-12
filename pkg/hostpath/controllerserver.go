@@ -26,6 +26,7 @@ import (
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"kubevirt.io/hostpath-provisioner/pkg/monitoring/metrics"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -132,12 +133,18 @@ func EnforceQuota(volPath, volID string, capacityBytes, poolCapacity int64) erro
 
 	switch fsType {
 	case ext4:
-		return setExt4ProjectQuota(volPath, id, capacityBytes)
+		err = setExt4ProjectQuota(volPath, id, capacityBytes)
 	case xfs:
-		return setXfsProjectQuota(volPath, id, capacityBytes)
+		err = setXfsProjectQuota(volPath, id, capacityBytes)
 	default:
 		return fmt.Errorf("unsupported filesystem %q for quota enforcement", fsType)
 	}
+	if err != nil {
+		return err
+	}
+
+	metrics.SetHPPVolQuotaBytes(volID, capacityBytes)
+	return nil
 }
 
 func (hpc *hostPathController) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (resp *csi.CreateVolumeResponse, finalErr error) {
