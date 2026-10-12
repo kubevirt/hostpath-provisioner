@@ -205,7 +205,7 @@ go.yaml.in/yaml/v3
 # golang.org/x/crypto v0.57.0
 ## explicit; go 1.26.0
 golang.org/x/crypto/ed25519
-# golang.org/x/net v0.59.0
+# golang.org/x/net v0.60.0
 ## explicit; go 1.26.0
 golang.org/x/net/bpf
 golang.org/x/net/context
