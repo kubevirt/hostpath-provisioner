@@ -25,6 +25,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 )
@@ -32,6 +33,15 @@ import (
 const (
 	TopologyKeyNode     = "topology.hostpath.csi/node"
 	ephemeralContextKey = "csi.storage.k8s.io/ephemeral"
+	// size is a CSI volume attribute on inline ephemeral volumes, for example "1Gi".
+	ephemeralSizeKey = "size"
+)
+
+// Replaced in tests so NodePublishVolume does not run host quota tools.
+var (
+	applyVolumeQuota     = EnforceQuota
+	poolOnRootDisk       = checkVolumePathSharedWithOS
+	getProjectQuotaStats = projectQuotaStatsBytes
 )
 
 type hostPathNode struct {
@@ -145,6 +155,12 @@ func (hpn *hostPathNode) mountVolume(targetPath string, req *csi.NodePublishVolu
 		if err := CreateVolumeDirectory(filepath.Dir(path), volumeId); err != nil {
 			return fmt.Errorf("failed to create ephemeral volume %v: %w", volumeId, err)
 		}
+		// Ephemeral volumes skip CreateVolume, so quota is applied here and defaults to on.
+		if err := hpn.enforceEphemeralQuota(path, volumeId, req.GetVolumeContext()); err != nil {
+			_ = os.RemoveAll(path)
+			klog.Errorf("unable to enforce quota for ephemeral volume: %s", err)
+			return err
+		}
 	} else {
 		path = filepath.Join(hpn.cfg.StoragePoolInfo[storagePoolName].Path, volumeId)
 	}
@@ -170,6 +186,41 @@ func (hpn *hostPathNode) mountVolume(targetPath string, req *csi.NodePublishVolu
 
 func isEphemeralVolumeRequest(req *csi.NodePublishVolumeRequest) bool {
 	return req.GetVolumeContext()[ephemeralContextKey] == "true"
+}
+
+// enforceEphemeralQuota applies a project quota only when the pod sets
+// enforceQuota=true and the pool directory is not on the root disk.
+func (hpn *hostPathNode) enforceEphemeralQuota(volPath, volID string, volCtx map[string]string) error {
+	if !shouldEnforceQuota(volCtx) {
+		return nil
+	}
+	poolPath := filepath.Dir(volPath)
+	if poolOnRootDisk(poolPath) {
+		klog.Warningf("skipping quota for ephemeral volume %s: pool %s is on the root disk", volID, poolPath)
+		return nil
+	}
+	requested, err := ephemeralCapacityBytes(volCtx)
+	if err != nil {
+		return err
+	}
+	_, poolCapacity, _, _, _, _, err := getPVStatsFunc(poolPath)
+	if err != nil {
+		return status.Errorf(codes.Internal, "unable to determine pool capacity for %s: %v", poolPath, err)
+	}
+	return applyVolumeQuota(volPath, volID, requested, poolCapacity)
+}
+
+// ephemeralCapacityBytes reads the pod volume attribute "size" (for example "1Gi").
+func ephemeralCapacityBytes(volCtx map[string]string) (int64, error) {
+	raw := volCtx[ephemeralSizeKey]
+	if raw == "" {
+		return 0, status.Error(codes.InvalidArgument, `ephemeral volume requires volume attribute "size"`)
+	}
+	quantity, err := resource.ParseQuantity(raw)
+	if err != nil {
+		return 0, status.Errorf(codes.InvalidArgument, "invalid ephemeral size %q: %v", raw, err)
+	}
+	return quantity.Value(), nil
 }
 
 func isEphemeralVolumeId(volumeId string) bool {
@@ -328,6 +379,25 @@ func (hpn *hostPathNode) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGe
 		return nil, fmt.Errorf("get volume stats failed: %w", err)
 	}
 
+	// statfs reports the entire backing filesystem. NodeGetVolumeStats does not
+	// carry VolumeContext, so find the backing PVC directory by its ID under the
+	// configured pools. When it has a project quota, report that limit and usage.
+	if volPath, ok := hpn.volumeBackingPath(req.GetVolumeId()); ok &&
+		!poolOnRootDisk(filepath.Dir(volPath)) {
+		quotaUsed, quotaHardLimit, err := getProjectQuotaStats(volPath)
+		if err != nil {
+			return nil, fmt.Errorf("get project quota stats for volume %s: %w", req.GetVolumeId(), err)
+		}
+		if quotaHardLimit > 0 {
+			used = quotaUsed
+			capacity = quotaHardLimit
+			available = quotaHardLimit - quotaUsed
+			if available < 0 {
+				available = 0
+			}
+		}
+	}
+
 	klog.V(3).Infof("Capacity: %+v Used: %+v Available: %+v Inodes: %+v Free inodes: %+v Used inodes: %+v", capacity, used, available, inodes, inodesFree, inodesUsed)
 	return &csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
@@ -348,6 +418,18 @@ func (hpn *hostPathNode) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGe
 			Message:  msg,
 		},
 	}, nil
+}
+
+// volumeBackingPath finds volID under one of this node's configured storage
+// pools. NodeGetVolumeStats only receives the kubelet mount path, not the pool.
+func (hpn *hostPathNode) volumeBackingPath(volID string) (string, bool) {
+	for _, pool := range hpn.cfg.StoragePoolInfo {
+		path := filepath.Join(pool.Path, volID)
+		if _, err := os.Stat(path); err == nil {
+			return path, true
+		}
+	}
+	return "", false
 }
 
 // NodeExpandVolume is only implemented so the driver can be used for e2e testing.
