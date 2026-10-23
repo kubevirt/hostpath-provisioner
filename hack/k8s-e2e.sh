@@ -112,8 +112,13 @@ export KUBE_SSH_USER=cloud-user
 echo "KUBE_SSH_USER=${KUBE_SSH_USER}, KEY_FILE=${KUBE_SSH_KEY_PATH}"
 k8s_version=$(_kubectl version -o json | jq ".serverVersion.gitVersion" -r)
 echo "Downloading test for version $k8s_version"
-#Download test
-curl --location https://dl.k8s.io/${k8s_version}/kubernetes-test-linux-amd64.tar.gz |   tar --strip-components=3 -zxf - kubernetes/test/bin/e2e.test kubernetes/test/bin/ginkgo
+#Download test for the machine running this script. amd64 jobs report x86_64.
+case "$(uname -m)" in
+  x86_64) test_arch=amd64 ;;
+  aarch64) test_arch=arm64 ;;
+  *) test_arch="$(uname -m)" ;;
+esac
+curl --location "https://dl.k8s.io/${k8s_version}/kubernetes-test-linux-${test_arch}.tar.gz" | tar --strip-components=3 -zxf - kubernetes/test/bin/e2e.test kubernetes/test/bin/ginkgo
 #Run test
 # Some of these tests assume immediate binding, which is a random node, however if multiple volumes are involved sometimes they end up on different nodes and the test fails. Excluding that test.
 SKIP_TESTS='immediate binding|External.Storage.*should access to two volumes with the same volume mode and retain data across pod recreation on the same node \[LinuxOnly\]'
