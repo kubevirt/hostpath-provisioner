@@ -93,6 +93,49 @@ func Test_NodeGetVolumeStatsHealthy(t *testing.T) {
 	Expect(resp.Usage[0].Available).To(BeNumerically(">", 0))
 }
 
+func TestNodeGetVolumeStatsReportsProjectQuota(t *testing.T) {
+	RegisterTestingT(t)
+
+	pool, err := os.MkdirTemp("", "hpp-pool")
+	Expect(err).ToNot(HaveOccurred())
+	defer os.RemoveAll(pool)
+	Expect(os.Mkdir(filepath.Join(pool, "pvc-123"), 0755)).To(Succeed())
+
+	oldStats := getPVStatsFunc
+	oldQuotaStats := getProjectQuotaStats
+	oldRootDisk := poolOnRootDisk
+	defer func() {
+		getPVStatsFunc = oldStats
+		getProjectQuotaStats = oldQuotaStats
+		poolOnRootDisk = oldRootDisk
+	}()
+	getPVStatsFunc = func(string) (int64, int64, int64, int64, int64, int64, error) {
+		return 900, 1000, 100, 10, 8, 2, nil
+	}
+	poolOnRootDisk = func(string) bool { return false }
+	getProjectQuotaStats = func(path string) (int64, int64, error) {
+		Expect(path).To(Equal(filepath.Join(pool, "pvc-123")))
+		return 200, 500, nil
+	}
+
+	nodeServer := NewHostPathNode(&Config{
+		NodeID:  testNode,
+		Mounter: mount.NewFakeMounter([]mount.MountPoint{}),
+		StoragePoolInfo: map[string]StoragePoolInfo{
+			"quota-pool": {Name: "quota-pool", Path: pool},
+		},
+	})
+
+	resp, err := nodeServer.NodeGetVolumeStats(context.TODO(), &csi.NodeGetVolumeStatsRequest{
+		VolumeId:   "pvc-123",
+		VolumePath: pool,
+	})
+	Expect(err).ToNot(HaveOccurred())
+	Expect(resp.Usage[0].Total).To(Equal(int64(500)))
+	Expect(resp.Usage[0].Used).To(Equal(int64(200)))
+	Expect(resp.Usage[0].Available).To(Equal(int64(300)))
+}
+
 func Test_NodeGetVolumeStatsUnhealthy(t *testing.T) {
 	RegisterTestingT(t)
 	defer func() {
@@ -399,10 +442,19 @@ func Test_NodePublishVolumeEphemeral(t *testing.T) {
 	nodeServer.cfg.StoragePoolInfo[legacyStoragePoolName] = StoragePoolInfo{
 		Path: tempDir,
 	}
+	origQuota := applyVolumeQuota
+	applyVolumeQuota = func(volPath, volID string, capacityBytes, poolCapacity int64) error {
+		return nil
+	}
+	defer func() { applyVolumeQuota = origQuota }()
+	origRoot := poolOnRootDisk
+	poolOnRootDisk = func(string) bool { return false }
+	defer func() { poolOnRootDisk = origRoot }()
 	_, err = nodeServer.NodePublishVolume(context.TODO(), &csi.NodePublishVolumeRequest{
 		VolumeId: "csi-abcd",
 		VolumeContext: map[string]string{
 			ephemeralContextKey: "true",
+			ephemeralSizeKey:    "1Gi",
 		},
 		TargetPath: filepath.Join(tempDir, validVolId),
 		VolumeCapability: &csi.VolumeCapability{
