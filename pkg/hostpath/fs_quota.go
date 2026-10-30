@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
@@ -41,9 +42,18 @@ const (
 const (
 	xfsQuotaBin = "xfs_quota"
 	limitBin    = "limit"
-	chattrBin   = "chattr"
 	setquotaBin = "setquota"
 	quotaBin    = "quota"
+)
+
+const (
+	// _IOR('X', 31, struct fsxattr) on 64-bit Linux. Not in this vendored x/sys.
+	fsIOCGetXattr = 0x801C581F
+	// _IOW('X', 32, struct fsxattr). Pair of fsIOCGetXattr.
+	fsIOCSetXattr = 0x401C5820
+
+	// New files created under this directory keep the same project ID.
+	fsXFlagProjInherit = 0x00000200
 )
 
 // fsxattr matches struct fsxattr in <linux/fs.h>. Field order and sizes must
@@ -64,15 +74,18 @@ type fsxattr struct {
 	Pad        [8]byte
 }
 
-const (
-	// _IOR('X', 31, struct fsxattr) on 64-bit Linux. Not in this vendored x/sys.
-	fsIOCGetXattr = 0x801C581F
-	// _IOW('X', 32, struct fsxattr). Pair of fsIOCGetXattr.
-	fsIOCSetXattr = 0x401C5820
-
-	// New files created under this directory keep the same project ID.
-	fsXFlagProjInherit = 0x00000200
+var (
+	projectIDLocks sync.Map // map[string]*sync.Mutex
 )
+
+// lock per pool path so it avoids unnecessarily blocking
+// creates in different pools
+func projectIDLock(poolPath string) *sync.Mutex {
+	klog.V(4).Infof("getting project-ID lock for pool %s", poolPath)
+	key := filepath.Clean(poolPath)
+	lock, _ := projectIDLocks.LoadOrStore(key, &sync.Mutex{})
+	return lock.(*sync.Mutex)
+}
 
 // committedQuotaBytes is the sum of hard limits on immediate children of baseDir (aka each PVC).
 func committedQuotaBytes(baseDir string) (int64, error) {
@@ -134,7 +147,7 @@ func projectUsageAndHardLimitBytes(dir, mount, fsType string) (int64, int64, err
 		}
 		used, hard, err := parseQuotaUsageAndHardLimit(out)
 		if err != nil {
-			return 0, 0, fmt.Errorf("failed to parse %s output for project %s on mount %s: %w", xfsQuotaBin, idStr, mount, err)
+			return 0, 0, fmt.Errorf("failed to parse %s output for project %s on mount %s: %w (output: %q)", xfsQuotaBin, idStr, mount, err, out)
 		}
 		return used, hard, nil
 	case ext4:
@@ -145,7 +158,7 @@ func projectUsageAndHardLimitBytes(dir, mount, fsType string) (int64, int64, err
 		}
 		usedKiB, hardKiB, err := parseQuotaUsageAndHardLimit(out)
 		if err != nil {
-			return 0, 0, fmt.Errorf("failed to parse %s output for project %s on mount %s: %w", quotaBin, idStr, mount, err)
+			return 0, 0, fmt.Errorf("failed to parse %s output for project %s on mount %s: %w (output: %q)", quotaBin, idStr, mount, err, out)
 		}
 		return usedKiB * 1024, hardKiB * 1024, nil
 	default:
@@ -185,7 +198,7 @@ func parseQuotaUsageAndHardLimit(out []byte) (int64, int64, error) {
 	var fields []string
 	for _, line := range strings.Split(string(out), "\n") {
 		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
+		if line == "" {
 			continue
 		}
 		fields = strings.Fields(line)
@@ -245,11 +258,9 @@ func getProjectID(path string) (uint32, error) {
 }
 
 // getNextProjectID returns the next project ID under baseDir by counting down.
-// No directories yet means maxProjectID. Otherwise it is one less than the
-// lowest ID already on a directory. 0 means "no project" and is never returned.
+// No directories yet means maxProjectID. Otherwise it the next highest available ID
 func getNextProjectID(baseDir string) (uint32, error) {
-	var minID uint32
-	found := false
+	usedIDs := make(map[uint32]struct{})
 
 	err := filepath.WalkDir(baseDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -262,12 +273,8 @@ func getNextProjectID(baseDir string) (uint32, error) {
 		if err != nil {
 			return fmt.Errorf("failed to read project ID for %s: %w", path, err)
 		}
-		if id == 0 {
-			return nil
-		}
-		if !found || id < minID {
-			minID = id
-			found = true
+		if id != 0 {
+			usedIDs[id] = struct{}{}
 		}
 		return nil
 	})
@@ -275,13 +282,16 @@ func getNextProjectID(baseDir string) (uint32, error) {
 		return 0, fmt.Errorf("failed to scan pool %s for project IDs: %w", baseDir, err)
 	}
 
-	if !found {
-		return uint32(maxProjectID), nil
+	for candidate := uint32(maxProjectID); ; candidate-- {
+		if _, used := usedIDs[candidate]; !used {
+			return candidate, nil
+		}
+		if candidate == minProjectID {
+			break
+		}
 	}
-	if minID <= minProjectID {
-		return 0, fmt.Errorf("failed to allocate project ID: no free IDs in range [%d, %d]", minProjectID, maxProjectID)
-	}
-	return minID - 1, nil
+
+	return 0, fmt.Errorf("failed to allocate project ID: no free IDs in range [%d, %d]", minProjectID, maxProjectID)
 }
 
 // getFilesystemType looks at the disk under path and returns "ext4" or "xfs".
@@ -309,8 +319,6 @@ func getFilesystemType(path string) (string, error) {
 // It also refuses the create when the pool has already promised more bytes
 // than the disk can hold.
 func assignProjectID(volPath, volID string, capacityBytes, poolCapacity int64) (uint32, error) {
-	_ = volID
-
 	// in case of CreateVolume retries
 	existingID, err := getProjectID(volPath)
 	if err != nil {
@@ -326,6 +334,11 @@ func assignProjectID(volPath, volID string, capacityBytes, poolCapacity int64) (
 	// may simply be a directory on a larger mounted filesystem (for example,
 	// poolPath=/var/hpvolumes while fileSystemMount(volPath) returns "/").
 	poolPath := filepath.Dir(volPath)
+
+	// locking pool path so race conditions are avoided
+	poolLock := projectIDLock(poolPath)
+	poolLock.Lock()
+	defer poolLock.Unlock()
 
 	committed, err := committedQuotaBytes(poolPath)
 	if err != nil {
@@ -395,30 +408,25 @@ func fileSystemMount(path string) (string, error) {
 // setExt4ProjectQuota tags the PVC directory with projectID and sets a hard
 // block limit so writes past capacityBytes fail with ENOSPC inside the pod.
 func setExt4ProjectQuota(volPath string, projectID uint32, capacityBytes int64) error {
+	// This operates on the directory inode, so it works through the CSI
+	// container's bind-mounted view of the pool. It also sets PROJINHERIT so
+	// files created below the PVC directory remain in this project.
+	if err := setProjectID(volPath, projectID); err != nil {
+		return fmt.Errorf("failed to assign ext4 project ID %d to volume %s: %w", projectID, volPath, err)
+	}
+
 	mount, err := fileSystemMount(volPath)
 	if err != nil {
 		return fmt.Errorf("failed to find filesystem mount for volume %s: %w", volPath, err)
 	}
 
-	// Tag this PVC directory with the project ID and inherit flag so new files
-	// stay in the same project. tune2fs is not used here: it enables project
-	// quotas on the whole filesystem (one-time mount/setup), not a per-volume limit.
-	out, err := exec.Command(chattrBin, "+P", volPath).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to run %s +P for volume %s: %w (output: %q)", chattrBin, volPath, err, out)
-	}
-
 	projectIDStr := strconv.FormatUint(uint64(projectID), 10)
-	out, err = exec.Command(chattrBin, "-p", projectIDStr, volPath).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to run %s -p %s for volume %s: %w (output: %q)", chattrBin, projectIDStr, volPath, err, out)
-	}
 
 	// setquota -P takes block limits in 1KiB units, not bytes. Round up so a
 	// request that is not a multiple of 1024 is not truncated below capacityBytes.
 	// repquota is not used: it only reports usage, it cannot set a hard limit.
 	capacityKiB := (capacityBytes + 1023) / 1024
-	out, err = exec.Command(setquotaBin, "-P", projectIDStr,
+	out, err := exec.Command(setquotaBin, "-P", projectIDStr,
 		"0", strconv.FormatInt(capacityKiB, 10),
 		"0", "0",
 		mount,
@@ -430,22 +438,23 @@ func setExt4ProjectQuota(volPath string, projectID uint32, capacityBytes int64) 
 	return nil
 }
 
-// setXfsProjectQuota does the same job as setExt4ProjectQuota, using xfs_quota.
-// "project -s" tags the PVC directory. "limit" sets the hard byte cap on the disk mount.
+// setXfsProjectQuota does the same job as setExt4ProjectQuota, using xfs_quota
+// only for the filesystem quota-table limit.
 func setXfsProjectQuota(volPath string, projectID uint32, capacityBytes int64) error {
+	// Do not use "xfs_quota project -s" for this. xfs_quota may report success
+	// without updating the inode when volPath is a CSI bind mount. The ioctl
+	// applies directly to the PVC directory inode instead.
+	if err := setProjectID(volPath, projectID); err != nil {
+		return fmt.Errorf("failed to assign XFS project ID %d to volume %s: %w", projectID, volPath, err)
+	}
+
 	mount, err := fileSystemMount(volPath)
 	if err != nil {
 		return fmt.Errorf("failed to find filesystem mount for volume %s: %w", volPath, err)
 	}
 
-	projectCmd := fmt.Sprintf("project -s -p %s %d", volPath, projectID)
-	out, err := exec.Command(xfsQuotaBin, "-x", "-c", projectCmd, mount).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to assign XFS project %d to volume %s on mount %s: %w (output: %q)", projectID, volPath, mount, err, out)
-	}
-
 	limitCmd := fmt.Sprintf("%s -p bhard=%d %d", limitBin, capacityBytes, projectID)
-	out, err = exec.Command(xfsQuotaBin, "-x", "-c", limitCmd, mount).CombinedOutput()
+	out, err := exec.Command(xfsQuotaBin, "-x", "-c", limitCmd, mount).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to set XFS quota limit for project %d on mount %s: %w (output: %q)", projectID, mount, err, out)
 	}
