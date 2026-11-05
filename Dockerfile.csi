@@ -1,6 +1,8 @@
 FROM registry.fedoraproject.org/fedora-minimal:42
 ARG TARGETARCH
-RUN if [ "${TARGETARCH}" = "amd64" ]; then microdnf install glibc -y; fi
+RUN if [ "${TARGETARCH}" = "amd64" ]; then \
+        microdnf install -y glibc xfsprogs e2fsprogs quota; \
+    fi
 COPY _out/hostpath-csi-driver /
 ENTRYPOINT ["/hostpath-csi-driver"]
 
