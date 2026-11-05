@@ -205,24 +205,15 @@ func (hpn *hostPathNode) NodeUnpublishVolume(ctx context.Context, req *csi.NodeU
 	targetPath := req.GetTargetPath()
 
 	klog.V(3).Infof("Unmounting path: %s", targetPath)
-	// Unmount only if the target path is really a mount point.
-	if notMnt, err := mount.IsNotMountPoint(hpn.cfg.Mounter, targetPath); err != nil {
-		if !os.IsNotExist(err) {
-			return nil, fmt.Errorf("check target path: %w", err)
-		}
-	} else if !notMnt {
-		klog.V(4).Info("Mount point")
-		// Unmounting the image or filesystem.
-		err = hpn.cfg.Mounter.Unmount(targetPath)
-		if err != nil {
-			return nil, fmt.Errorf("unmount target path: %w", err)
-		}
+	// CleanupMountPoint treats stat errors other than corrupted mounts as a
+	// missing path, so report them here.
+	if _, err := os.Stat(targetPath); err != nil && !os.IsNotExist(err) && !mount.IsCorruptedMnt(err) {
+		return nil, fmt.Errorf("check target path: %w", err)
 	}
-	klog.V(4).Infof("Deleting mount point: %s", targetPath)
-	// Delete the mount point.
-	// Does not return error for non-existent path, repeated calls OK for idempotency.
-	if err := os.RemoveAll(targetPath); err != nil {
-		return nil, fmt.Errorf("remove target path: %w", err)
+	// Unlike a mountpoint check, CleanupMountPoint still unmounts corrupted
+	// mounts such as stale NFS handles. It removes only an empty directory.
+	if err := mount.CleanupMountPoint(targetPath, hpn.cfg.Mounter, true); err != nil {
+		return nil, fmt.Errorf("clean up target path: %w", err)
 	}
 	klog.V(4).Infof("hostpath: volume %s has been unpublished.", targetPath)
 	if isEphemeralVolumeId(req.GetVolumeId()) {

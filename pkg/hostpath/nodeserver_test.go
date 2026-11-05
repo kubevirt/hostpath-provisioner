@@ -277,6 +277,35 @@ func Test_NodeUnpublishVolumeMountUnmountError(t *testing.T) {
 	Expect(err.Error()).To(ContainSubstring("unmountError"))
 }
 
+func Test_NodeUnpublishVolumePreservesNonEmptyTarget(t *testing.T) {
+	RegisterTestingT(t)
+	nodeServer := createNodeServer(testNode)
+	target := filepath.Join(t.TempDir(), "target")
+	Expect(os.Mkdir(target, 0750)).To(Succeed())
+	file := filepath.Join(target, "data")
+	Expect(os.WriteFile(file, []byte("keep"), 0600)).To(Succeed())
+
+	_, err := nodeServer.NodeUnpublishVolume(context.TODO(), &csi.NodeUnpublishVolumeRequest{
+		VolumeId:   "abcd",
+		TargetPath: target,
+	})
+	Expect(err).To(HaveOccurred())
+	Expect(os.ReadFile(file)).To(BeEquivalentTo("keep"))
+}
+
+func Test_NodeUnpublishVolumeStatError(t *testing.T) {
+	RegisterTestingT(t)
+	nodeServer := createNodeServer(testNode)
+	parent := filepath.Join(t.TempDir(), "file")
+	Expect(os.WriteFile(parent, nil, 0600)).To(Succeed())
+
+	_, err := nodeServer.NodeUnpublishVolume(context.TODO(), &csi.NodeUnpublishVolumeRequest{
+		VolumeId:   "abcd",
+		TargetPath: filepath.Join(parent, "target"),
+	})
+	Expect(err).To(MatchError(ContainSubstring("not a directory")))
+}
+
 func Test_validateRequestCapabilties(t *testing.T) {
 	RegisterTestingT(t)
 	nodeServer := createNodeServer(testNode)
