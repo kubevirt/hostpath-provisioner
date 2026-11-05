@@ -25,8 +25,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
-	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -46,7 +44,6 @@ var (
 	CreateVolumeDirectory = createVolumeDirectoryFunc
 	checkPathExist        = checkPathExistFunc
 	checkPathIsEmpty      = checkPathIsEmptyFunc
-	getFileCreationTime   = getFileCreationTimeFunc
 )
 
 type SnapshotProviderType string
@@ -340,14 +337,4 @@ func checkPathIsEmptyFunc(path string) (bool, error) {
 		return false, err
 	}
 	return true, nil
-}
-
-func getFileCreationTimeFunc(file string) (*time.Time, error) {
-	var stat syscall.Stat_t
-	err := syscall.Stat(file, &stat)
-	if err != nil {
-		return nil, err
-	}
-	creationTime := time.Unix(stat.Ctim.Sec, 0)
-	return &creationTime, nil
 }
