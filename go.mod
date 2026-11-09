@@ -9,7 +9,7 @@ require (
 	github.com/kubernetes-csi/csi-test/v4 v4.4.0
 	github.com/kubevirt/monitoring/pkg/metrics/parser v0.0.0-20230710120526-cc1644c90b64
 	github.com/onsi/gomega v1.42.1
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.94.2
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.95.1
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
 	github.com/rhobs/operator-observability-toolkit v0.0.30
@@ -23,7 +23,7 @@ require (
 	k8s.io/apimachinery v0.37.2
 	k8s.io/client-go v0.37.2
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
+	k8s.io/utils v0.0.0-20261023123148-ca04ba58ecab
 	kubevirt.io/hostpath-provisioner-operator v0.26.0
 	sigs.k8s.io/controller-runtime v0.25.2
 	sigs.k8s.io/sig-storage-lib-external-provisioner/v6 v6.3.0
