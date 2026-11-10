@@ -16,19 +16,25 @@ limitations under the License.
 package hostpath
 
 import (
+	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	. "github.com/onsi/gomega"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
 	testSnapshot    = "snapshot-123"
 	testSnapshot2   = "snapshot-234"
 	testVolume      = "volume-123"
+	testVolume2     = "volume-234"
 	testSnapshotDir = "snapshots"
 	testVolumeDir   = "volumes"
 )
@@ -201,6 +207,105 @@ func TestReflink_CreateSnapshot(t *testing.T) {
 		Expect(snapshot.SnapshotId).To(Equal(testSnapshot))
 		Expect(snapshot.SourceVolumeId).To(Equal(testVolume))
 	})
+}
+
+// newTestReflink returns a provider whose source volumes each contain disk.img
+// holding the volume ID.
+func newTestReflink(t *testing.T) *Reflink {
+	tempDir := t.TempDir()
+	reflink := &Reflink{
+		path:       filepath.Join(tempDir, testSnapshotDir),
+		sourcePath: filepath.Join(tempDir, testVolumeDir),
+		nodeName:   "testnode",
+	}
+	Expect(reflink.Initialize()).To(Succeed())
+	for _, volume := range []string{testVolume, testVolume2} {
+		Expect(ensurePathExists(filepath.Join(reflink.sourcePath, volume))).To(Succeed())
+		Expect(os.WriteFile(filepath.Join(reflink.sourcePath, volume, "disk.img"), []byte(volume), 0644)).To(Succeed())
+	}
+	return reflink
+}
+
+func TestReflink_CreateSnapshotRetriesInterruptedCopy(t *testing.T) {
+	RegisterTestingT(t)
+	reflink := newTestReflink(t)
+	controller := createControllerServer(reflink.sourcePath)
+	controller.cfg.StoragePoolInfo[legacyStoragePoolName] = StoragePoolInfo{Path: reflink.sourcePath, SnapshotPath: &reflink.path}
+	controller.snapshotproviders[legacyStoragePoolName] = reflink
+	// Left behind by a process that exited before removing its staging directory.
+	abandoned := filepath.Join(reflink.path, snapshotStagingPath, "abandoned")
+	Expect(ensurePathExists(filepath.Join(abandoned, testVolume))).To(Succeed())
+
+	originalCopy := CopyReflinkFunc
+	defer func() { CopyReflinkFunc = originalCopy }()
+	CopyReflinkFunc = func(src, dst string) error {
+		snapshot, err := reflink.GetSnapshotById(testSnapshot)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(snapshot).To(BeNil())
+		Expect(reflink.GetAllSnapshots()).To(BeEmpty())
+		Expect(status.Code(reflink.RestoreSnapshot(testSnapshot, t.TempDir()))).To(Equal(codes.NotFound))
+		Expect(os.WriteFile(filepath.Join(dst, "disk.img"), []byte("partial"), 0644)).To(Succeed())
+		return errors.New("copy interrupted")
+	}
+	req := &csi.CreateSnapshotRequest{Name: testSnapshot, SourceVolumeId: testVolume}
+	_, err := controller.CreateSnapshot(context.TODO(), req)
+	Expect(err).To(HaveOccurred())
+
+	CopyReflinkFunc = originalCopy
+	res, err := controller.CreateSnapshot(context.TODO(), req)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(res.GetSnapshot().GetReadyToUse()).To(BeTrue())
+	Expect(os.ReadFile(filepath.Join(reflink.path, testSnapshot, dataPath, "disk.img"))).To(BeEquivalentTo(testVolume))
+	entries, err := os.ReadDir(filepath.Join(reflink.path, snapshotStagingPath))
+	Expect(err).ToNot(HaveOccurred())
+	Expect(entries).To(HaveLen(1))
+	Expect(entries[0].Name()).To(Equal("abandoned"))
+}
+
+func TestReflink_CreateSnapshotPublishRace(t *testing.T) {
+	for _, winner := range []string{testVolume, testVolume2} {
+		t.Run(winner, func(t *testing.T) {
+			RegisterTestingT(t)
+			reflink := newTestReflink(t)
+			originalCopy := CopyReflinkFunc
+			defer func() { CopyReflinkFunc = originalCopy }()
+			CopyReflinkFunc = func(src, dst string) error {
+				// Another controller sharing the storage pool publishes first.
+				CopyReflinkFunc = originalCopy
+				other := &Reflink{path: reflink.path, sourcePath: reflink.sourcePath}
+				_, err := other.CreateSnapshot(testSnapshot, winner)
+				Expect(err).ToNot(HaveOccurred())
+				return originalCopy(src, dst)
+			}
+			snapshot, err := reflink.CreateSnapshot(testSnapshot, testVolume)
+			if winner == testVolume {
+				Expect(err).ToNot(HaveOccurred())
+				Expect(snapshot.GetReadyToUse()).To(BeTrue())
+			} else {
+				Expect(status.Code(err)).To(Equal(codes.AlreadyExists))
+			}
+			Expect(os.ReadFile(filepath.Join(reflink.path, testSnapshot, dataPath, "disk.img"))).To(BeEquivalentTo(winner))
+			Expect(os.ReadDir(filepath.Join(reflink.path, snapshotStagingPath))).To(BeEmpty())
+		})
+	}
+}
+
+func TestReflink_StagingIsNotASnapshot(t *testing.T) {
+	RegisterTestingT(t)
+	reflink := newTestReflink(t)
+	// An attempt that another controller is still copying.
+	attempt := filepath.Join(reflink.path, snapshotStagingPath, "attempt")
+	Expect(ensurePathExists(filepath.Join(attempt, dataPath))).To(Succeed())
+	Expect(ensurePathExists(filepath.Join(attempt, testVolume))).To(Succeed())
+	for _, id := range []string{snapshotStagingPath, snapshotStagingPath + "/attempt", "..", ""} {
+		Expect(reflink.GetSnapshotById(id)).To(BeNil(), id)
+		_, err := reflink.CreateSnapshot(id, testVolume)
+		Expect(status.Code(err)).To(Equal(codes.InvalidArgument), id)
+		Expect(status.Code(reflink.RestoreSnapshot(id, t.TempDir()))).To(Equal(codes.NotFound), id)
+		Expect(reflink.DeleteSnapshot(id)).To(Succeed(), id)
+	}
+	Expect(attempt).To(BeADirectory())
+	Expect(filepath.Join(reflink.sourcePath, testVolume)).To(BeADirectory())
 }
 
 func TestReflink_DeleteSnapshot(t *testing.T) {
