@@ -35,6 +35,7 @@ type MountPointInfo struct {
 var (
 	checkMountPointExistsFunc = checkMountPointExist
 	getPVStatsFunc            = getPVStats
+	getCommittedQuotaBytes    = committedQuotaBytes
 )
 
 type FileSystems struct {
@@ -99,6 +100,28 @@ func fsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 
 func getPVStats(volumePath string) (available int64, capacity int64, used int64, inodes int64, inodesFree int64, inodesUsed int64, err error) {
 	return fsInfo(volumePath)
+}
+
+// getPoolStats counts each quota's full hard limit as allocated pool space.
+// Pool usage is the sum of PVC reservations regardless of actual bytes written.
+func getPoolStats(poolPath string, reserveQuota bool) (available int64, capacity int64, used int64, inodes int64, inodesFree int64, inodesUsed int64, err error) {
+	available, capacity, used, inodes, inodesFree, inodesUsed, err = getPVStatsFunc(poolPath)
+	klog.Infof("pool stat: capacity: %d", capacity)
+	if err != nil || !reserveQuota || poolOnRootDisk(poolPath) {
+		return
+	}
+	committed, quotaErr := getCommittedQuotaBytes(poolPath)
+	if quotaErr != nil {
+		err = fmt.Errorf("failed to calculate quota reservations for pool %s: %w", poolPath, quotaErr)
+		return
+	}
+	used = committed
+	available = capacity - committed
+	if available < 0 {
+		available = 0
+	}
+	klog.Infof("pool stat: available: %d", available)
+	return
 }
 
 func checkPVUsage(volumePath string) (int64, int64, error) {
