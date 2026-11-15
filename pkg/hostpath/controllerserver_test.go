@@ -731,6 +731,15 @@ func Test_ListVolumes(t *testing.T) {
 			})
 		})
 	})
+	t.Run("one entry left after the page", func(t *testing.T) {
+		resp, err := controller.ListVolumes(context.TODO(), &csi.ListVolumesRequest{
+			MaxEntries:    4,
+			StartingToken: "4",
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(len(resp.Entries)).To(Equal(4))
+		Expect(resp.GetNextToken()).To(Equal("8"))
+	})
 	t.Run("invalid volume name", func(t *testing.T) {
 		_, err = controller.ListVolumes(context.TODO(), &csi.ListVolumesRequest{
 			MaxEntries:    3,
@@ -767,7 +776,40 @@ func Test_ListVolumes(t *testing.T) {
 		}
 		Expect(resp.GetNextToken()).To(BeEmpty())
 	})
+	t.Run("starting token past the end", func(t *testing.T) {
+		_, err := controller.ListVolumes(context.TODO(), &csi.ListVolumesRequest{
+			StartingToken: "9",
+		})
+		Expect(err).To(BeEquivalentTo(status.Error(codes.Aborted, "volume 9 not found")))
+	})
 
+}
+
+func Test_ListVolumesPagesThroughVolumeNames(t *testing.T) {
+	RegisterTestingT(t)
+	tempDir, err := os.MkdirTemp(os.TempDir(), "")
+	Expect(err).ToNot(HaveOccurred())
+	defer os.RemoveAll(tempDir)
+	names := []string{"pvc-a", "pvc-b", "pvc-c", "pvc-d", "pvc-e"}
+	for _, name := range names {
+		Expect(os.Mkdir(filepath.Join(tempDir, name), 0666)).To(Succeed())
+	}
+	controller := createControllerServer(tempDir)
+
+	listed := []string{}
+	req := &csi.ListVolumesRequest{MaxEntries: 2}
+	for {
+		resp, err := controller.ListVolumes(context.TODO(), req)
+		Expect(err).ToNot(HaveOccurred())
+		for _, entry := range resp.Entries {
+			listed = append(listed, entry.Volume.VolumeId)
+		}
+		if resp.GetNextToken() == "" {
+			break
+		}
+		req.StartingToken = resp.GetNextToken()
+	}
+	Expect(listed).To(Equal(names))
 }
 
 func Test_ListVolumesNonEmptyStartTokenNoVolumes(t *testing.T) {
@@ -1281,6 +1323,29 @@ func Test_ListAllSnapshots(t *testing.T) {
 			})
 		})
 	})
+	t.Run("one entry left after the page", func(t *testing.T) {
+		res, err := controller.ListSnapshots(context.TODO(), &csi.ListSnapshotsRequest{
+			MaxEntries:    4,
+			StartingToken: "5",
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(len(res.Entries)).To(Equal(4))
+		Expect(res.GetNextToken()).To(Equal("9"))
+	})
+	t.Run("starting token past the end", func(t *testing.T) {
+		for _, token := range []string{"10", "11"} {
+			_, err := controller.ListSnapshots(context.TODO(), &csi.ListSnapshotsRequest{
+				StartingToken: token,
+			})
+			Expect(err).To(BeEquivalentTo(status.Error(codes.Aborted, "snapshot "+token+" not found")))
+		}
+	})
+	t.Run("negative max entries", func(t *testing.T) {
+		_, err := controller.ListSnapshots(context.TODO(), &csi.ListSnapshotsRequest{
+			MaxEntries: -1,
+		})
+		Expect(err).To(BeEquivalentTo(status.Error(codes.InvalidArgument, "maxEntries < 0")))
+	})
 	t.Run("invalid snapshot name", func(t *testing.T) {
 		_, err = controller.ListSnapshots(context.TODO(), &csi.ListSnapshotsRequest{
 			MaxEntries:    3,
@@ -1304,6 +1369,36 @@ func Test_ListAllSnapshots(t *testing.T) {
 		}
 		Expect(res.GetNextToken()).To(BeEmpty())
 	})
+}
+
+func Test_ListSnapshotsPagesThroughStoragePools(t *testing.T) {
+	RegisterTestingT(t)
+	controller := createControllerServer("")
+	poolA := &mockSnapshotprovider{}
+	poolB := &mockSnapshotprovider{}
+	for i := 1; i <= 3; i++ {
+		poolA.snapshots = append(poolA.snapshots, csi.Snapshot{SnapshotId: fmt.Sprintf("a%d", i)})
+		poolB.snapshots = append(poolB.snapshots, csi.Snapshot{SnapshotId: fmt.Sprintf("b%d", i)})
+	}
+	controller.snapshotproviders = map[string]SnapshotProvider{"pool-a": poolA, "pool-b": poolB}
+
+	// Map iteration order is random, so walk the pages several times.
+	for range 20 {
+		listed := []string{}
+		req := &csi.ListSnapshotsRequest{MaxEntries: 2}
+		for {
+			res, err := controller.ListSnapshots(context.TODO(), req)
+			Expect(err).ToNot(HaveOccurred())
+			for _, entry := range res.Entries {
+				listed = append(listed, entry.Snapshot.SnapshotId)
+			}
+			if res.GetNextToken() == "" {
+				break
+			}
+			req.StartingToken = res.GetNextToken()
+		}
+		Expect(listed).To(Equal([]string{"a1", "a2", "a3", "b1", "b2", "b3"}))
+	}
 }
 
 func Test_ControllerExpandVolume(t *testing.T) {
