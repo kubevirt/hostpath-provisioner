@@ -60,7 +60,8 @@ var (
 )
 
 const (
-	dataPath = "data"
+	dataPath            = "data"
+	snapshotStagingPath = ".hpp-staging"
 )
 
 func reflinkCopy(src, dst string) error {
@@ -80,6 +81,9 @@ func (r *Reflink) Initialize() error {
 }
 
 func (r *Reflink) GetSnapshotById(snapshotId string) (*csi.Snapshot, error) {
+	if !isSnapshotID(snapshotId) {
+		return nil, nil
+	}
 	info, err := os.Stat(filepath.Join(r.path, snapshotId))
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -139,7 +143,7 @@ func (r *Reflink) GetAllSnapshots() ([]csi.Snapshot, error) {
 
 	snapshots := make([]csi.Snapshot, 0)
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		if !entry.IsDir() || entry.Name() == snapshotStagingPath {
 			continue
 		}
 		snapshot, err := r.GetSnapshotById(entry.Name())
@@ -152,19 +156,37 @@ func (r *Reflink) GetAllSnapshots() ([]csi.Snapshot, error) {
 }
 
 func (r *Reflink) CreateSnapshot(snapshotId, sourceVolumeId string) (*csi.Snapshot, error) {
+	if !isSnapshotID(snapshotId) {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid snapshot ID %q", snapshotId)
+	}
 	// Check if the source volume exists, so we can snapshot it.
 	sourcePoolDir := filepath.Join(r.sourcePath, sourceVolumeId)
 	if exists, err := checkPathExist(sourcePoolDir); err != nil {
 		return nil, err
 	} else if exists {
-		snapshotDir := filepath.Join(r.path, snapshotId, dataPath)
-		sourceDir := filepath.Join(r.path, snapshotId, sourceVolumeId)
-		snapshotExists, err := checkPathExist(snapshotDir)
+		if snapshot, err := r.existingSnapshot(snapshotId, sourceVolumeId); err != nil {
+			return nil, err
+		} else if snapshot != nil {
+			return snapshot, nil
+		}
+		// Keep incomplete copies on the same filesystem, outside the namespace
+		// exposed by snapshot lookup and listing. Each attempt owns its directory;
+		// a retry must not remove another node's copy on a shared storage pool.
+		stagingRoot := filepath.Join(r.path, snapshotStagingPath)
+		if err := os.MkdirAll(stagingRoot, 0755); err != nil {
+			return nil, err
+		}
+		attempt, err := os.MkdirTemp(stagingRoot, "snapshot-")
 		if err != nil {
 			return nil, err
-		} else if snapshotExists {
-			return r.createSnapshotFromDir(snapshotId, sourceVolumeId, snapshotDir)
 		}
+		defer func() {
+			if err := os.RemoveAll(attempt); err != nil {
+				klog.Warningf("Failed to remove snapshot staging directory %s: %v", attempt, err)
+			}
+		}()
+		snapshotDir := filepath.Join(attempt, dataPath)
+		sourceDir := filepath.Join(attempt, sourceVolumeId)
 		if err := os.MkdirAll(snapshotDir, 0755); err != nil {
 			return nil, err
 		}
@@ -176,25 +198,48 @@ func (r *Reflink) CreateSnapshot(snapshotId, sourceVolumeId string) (*csi.Snapsh
 		if err := CopyReflinkFunc(sourcePoolDirContents, snapshotDir); err != nil {
 			return nil, err
 		}
-		return r.createSnapshotFromDir(snapshotId, sourceVolumeId, snapshotDir)
+		// MkdirTemp creates 0700; keep the mode of previously published snapshots.
+		if err := os.Chmod(attempt, 0755); err != nil {
+			return nil, err
+		}
+		// Publish both data and source metadata only after the copy succeeds.
+		if err := os.Rename(attempt, filepath.Join(r.path, snapshotId)); err != nil {
+			// A different controller may have completed the same snapshot first.
+			if snapshot, lookupErr := r.existingSnapshot(snapshotId, sourceVolumeId); lookupErr != nil {
+				return nil, lookupErr
+			} else if snapshot != nil {
+				return snapshot, nil
+			}
+			return nil, fmt.Errorf("publish snapshot %s: %w", snapshotId, err)
+		}
+		return r.GetSnapshotById(snapshotId)
 	}
 	return nil, fmt.Errorf("source volume %s not found, unable to create snapshot", sourcePoolDir)
 }
 
-func (r *Reflink) createSnapshotFromDir(snapshotId, sourceVolumeId, path string) (*csi.Snapshot, error) {
-	creationTime, err := getFileCreationTime(path)
+// isSnapshotID reports whether snapshotId can name a published snapshot: a direct
+// child of the snapshot directory other than the private staging area. Other IDs
+// are treated as nonexistent snapshots.
+func isSnapshotID(snapshotId string) bool {
+	return snapshotId != "" && snapshotId != "." && snapshotId != ".." &&
+		snapshotId != snapshotStagingPath && filepath.Base(snapshotId) == snapshotId
+}
+
+func (r *Reflink) existingSnapshot(snapshotId, sourceVolumeId string) (*csi.Snapshot, error) {
+	snapshot, err := r.GetSnapshotById(snapshotId)
 	if err != nil {
 		return nil, err
 	}
-	return &csi.Snapshot{
-		SnapshotId:     snapshotId,
-		SourceVolumeId: sourceVolumeId,
-		ReadyToUse:     true,
-		CreationTime:   timestamppb.New(*creationTime),
-	}, nil
+	if snapshot != nil && snapshot.SourceVolumeId != sourceVolumeId {
+		return nil, status.Errorf(codes.AlreadyExists, "snapshot %s already exists for a different source volume", snapshotId)
+	}
+	return snapshot, nil
 }
 
 func (r *Reflink) DeleteSnapshot(snapshotId string) error {
+	if !isSnapshotID(snapshotId) {
+		return nil
+	}
 	snapPath := filepath.Join(r.path, snapshotId)
 	if exists, err := checkPathExist(snapPath); err != nil {
 		return err
@@ -207,6 +252,9 @@ func (r *Reflink) DeleteSnapshot(snapshotId string) error {
 }
 
 func (r *Reflink) RestoreSnapshot(snapshotId, targetPath string) error {
+	if !isSnapshotID(snapshotId) {
+		return status.Errorf(codes.NotFound, "snapshot %s not found, unable to restore into volume", snapshotId)
+	}
 	snapPath := filepath.Join(r.path, snapshotId, dataPath)
 	if exists, err := checkPathExist(snapPath); err != nil {
 		return err
