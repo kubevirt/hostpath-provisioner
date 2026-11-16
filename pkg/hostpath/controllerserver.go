@@ -510,6 +510,9 @@ func (hpc *hostPathController) ListSnapshots(ctx context.Context, req *csi.ListS
 
 	var snapshots []csi.Snapshot
 	for _, snapshotProvider := range hpc.snapshotproviders {
+		if err := snapshotProvider.Initialize(); err != nil {
+			return nil, fmt.Errorf("failed to initialize snapshot storage pool %v", err)
+		}
 		if len(req.GetSnapshotId()) != 0 {
 			snapshot, err := snapshotProvider.GetSnapshotById(req.GetSnapshotId())
 			if err != nil {
