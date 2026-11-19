@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"sync"
 
@@ -319,26 +320,22 @@ func (hpc *hostPathController) ListVolumes(ctx context.Context, req *csi.ListVol
 		return nil, err
 	}
 
+	var start uint64
 	if req.StartingToken != "" {
-		_, err = strconv.ParseUint(req.StartingToken, 10, 32)
+		start, err = strconv.ParseUint(req.StartingToken, 10, 32)
 		if err != nil {
 			return nil, status.Error(codes.Aborted, "the type of startingToken should be integer")
 		}
 	}
 
 	if len(volumeDirs) > 0 {
-		if req.StartingToken == "" {
-			req.StartingToken = filepath.Base(volumeDirs[0])
-		}
-
 		volumesLength := int64(len(volumeDirs))
 		maxLength := int64(req.MaxEntries)
 		if maxLength == 0 {
 			maxLength = volumesLength
 		}
-		start := IndexOfStartingToken(req.StartingToken, volumeDirs)
-		if start == -1 {
-			return nil, status.Errorf(codes.InvalidArgument, "volume %s not found", req.StartingToken)
+		if start >= uint64(volumesLength) {
+			return nil, status.Errorf(codes.Aborted, "volume %s not found", req.StartingToken)
 		}
 
 		end := int64(start) + maxLength
@@ -364,8 +361,8 @@ func (hpc *hostPathController) ListVolumes(ctx context.Context, req *csi.ListVol
 				},
 			})
 		}
-		if end < volumesLength-1 {
-			volumeRes.NextToken = filepath.Base(volumeDirs[end])
+		if end < volumesLength {
+			volumeRes.NextToken = strconv.FormatInt(end, 10)
 		}
 	} else {
 		if req.StartingToken != "" {
@@ -505,6 +502,9 @@ func (hpc *hostPathController) ListSnapshots(ctx context.Context, req *csi.ListS
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "missing request")
 	}
+	if req.MaxEntries < 0 {
+		return nil, status.Error(codes.InvalidArgument, "maxEntries < 0")
+	}
 	hpc.snapMutex.Lock()
 	defer hpc.snapMutex.Unlock()
 
@@ -535,6 +535,8 @@ func (hpc *hostPathController) ListSnapshots(ctx context.Context, req *csi.ListS
 			snapshots = append(snapshots, allProviderSnapshots...)
 		}
 	}
+	// snapshotproviders is a map, so sort to keep the order, and the page tokens, stable between calls.
+	sort.Slice(snapshots, func(i, j int) bool { return snapshots[i].SnapshotId < snapshots[j].SnapshotId })
 	snapshotRes := &csi.ListSnapshotsResponse{}
 	if len(snapshots) > 0 {
 		snapshotRes.Entries = []*csi.ListSnapshotsResponse_Entry{}
@@ -552,6 +554,9 @@ func (hpc *hostPathController) ListSnapshots(ctx context.Context, req *csi.ListS
 			return nil, status.Error(codes.Aborted, "the type of startingToken should be integer")
 		}
 		start = start - 1
+		if start >= uint64(snapshotLength) {
+			return nil, status.Errorf(codes.Aborted, "snapshot %s not found", req.StartingToken)
+		}
 		end := int64(start) + maxLength
 
 		if end > snapshotLength {
@@ -563,7 +568,7 @@ func (hpc *hostPathController) ListSnapshots(ctx context.Context, req *csi.ListS
 				Snapshot: &val,
 			})
 		}
-		if end < snapshotLength-1 {
+		if end < snapshotLength {
 			snapshotRes.NextToken = strconv.FormatInt(end+1, 10)
 		}
 	} else {
