@@ -25,7 +25,7 @@ require (
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/utils v0.0.0-20261023123148-ca04ba58ecab
 	kubevirt.io/hostpath-provisioner-operator v0.26.0
-	sigs.k8s.io/controller-runtime v0.25.2
+	sigs.k8s.io/controller-runtime v0.25.3
 	sigs.k8s.io/sig-storage-lib-external-provisioner/v6 v6.3.0
 )
 
