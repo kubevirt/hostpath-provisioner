@@ -97,6 +97,9 @@ HPP_CSI_SC="${OPERATOR_URL}/storageclass-wffc-legacy-csi.yaml"
 if [ "${KUBEVIRT_STORAGE}" == "rook-ceph-default" ] && [ "${HPP_CR_TYPE}" == "storagepool-pvc-template" ]; then
   HPP_CR_PATH="deploy/tests/hostpathprovisioner_ceph_pvc_pool_cr.yaml"
   HPP_CSI_SC="deploy/tests/storageclass_wffc_ceph_pool.yaml"
+elif [ "${KUBEVIRT_STORAGE}" == "rook-ceph-default" ] && [ "${HPP_CR_QUOTA}" == "pvc-quota" ]; then
+  HPP_CR_PATH="deploy/tests/hostpathprovisioner_ceph_pvc_pool_quota_cr.yaml"
+  HPP_CSI_SC="deploy/tests/storageclass_wffc_ceph_pool_quota.yaml"
 elif [ "${HPP_CR_TYPE}" == "overlay-csi" ]; then
   HPP_CR_PATH="deploy/tests/hostpathprovisioner_nfs_overlay_cr.yaml"
   HPP_CSI_SC="deploy/tests/storageclass_wffc_nfs_overlay.yaml"
