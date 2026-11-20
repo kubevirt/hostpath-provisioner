@@ -94,16 +94,25 @@ wait_for_operator_webhook
 
 HPP_CR_PATH="${OPERATOR_URL}/hostpathprovisioner_legacy_cr.yaml"
 HPP_CSI_SC="${OPERATOR_URL}/storageclass-wffc-legacy-csi.yaml"
-if [ "${KUBEVIRT_STORAGE}" == "rook-ceph-default" ] && [ "${HPP_CR_TYPE}" == "storagepool-pvc-template" ]; then
+if [ "${KUBEVIRT_STORAGE}" == "rook-ceph-default" ] && [ "${HPP_CR_QUOTA}" == "pvc-quota-mixed" ]; then
+  HPP_CR_PATH="deploy/tests/hostpathprovisioner_ceph_mixed_pools_cr.yaml"
+  HPP_CSI_SC="deploy/tests/storageclass_wffc_ceph_pool_quota_mixed.yaml"
+elif [ "${KUBEVIRT_STORAGE}" == "rook-ceph-default" ] && [ "${HPP_CR_TYPE}" == "storagepool-pvc-template" ]; then
   HPP_CR_PATH="deploy/tests/hostpathprovisioner_ceph_pvc_pool_cr.yaml"
   HPP_CSI_SC="deploy/tests/storageclass_wffc_ceph_pool.yaml"
+elif [ "${KUBEVIRT_STORAGE}" == "rook-ceph-default" ] && [ "${HPP_CR_QUOTA}" == "pvc-quota-block" ]; then
+  HPP_CR_PATH="deploy/tests/hostpathprovisioner_ceph_pvc_pool_quota_cr.yaml"
+  HPP_CSI_SC="deploy/tests/storageclass_wffc_ceph_pool_quota_block.yaml"
+elif [ "${KUBEVIRT_STORAGE}" == "rook-ceph-default" ] && [ "${HPP_CR_QUOTA}" == "pvc-quota-fs" ]; then
+  HPP_CR_PATH="deploy/tests/hostpathprovisioner_ceph_pvc_fs_pool_cr.yaml"
+  HPP_CSI_SC="deploy/tests/storageclass_wffc_ceph_pool_quota_fs.yaml"
 elif [ "${HPP_CR_TYPE}" == "overlay-csi" ]; then
   HPP_CR_PATH="deploy/tests/hostpathprovisioner_nfs_overlay_cr.yaml"
   HPP_CSI_SC="deploy/tests/storageclass_wffc_nfs_overlay.yaml"
 fi
 retry_kubectl_apply "$HPP_CR_PATH"
 _kubectl apply -f ${OPERATOR_URL}/storageclass-wffc-legacy.yaml
-_kubectl apply -f $HPP_CSI_SC
+_kubectl apply -f "$HPP_CSI_SC"
 
 cat <<EOF | _kubectl apply -f -
 apiVersion: storage.k8s.io/v1
