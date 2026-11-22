@@ -118,7 +118,7 @@ case "$(uname -m)" in
   aarch64) test_arch=arm64 ;;
   *) test_arch="$(uname -m)" ;;
 esac
-curl --location "https://dl.k8s.io/${k8s_version}/kubernetes-test-linux-${test_arch}.tar.gz" | tar --strip-components=3 -zxf - kubernetes/test/bin/e2e.test kubernetes/test/bin/ginkgo
+curl --fail --location "https://dl.k8s.io/${k8s_version}/kubernetes-test-linux-${test_arch}.tar.gz" | tar --strip-components=3 -zxf - kubernetes/test/bin/e2e.test kubernetes/test/bin/ginkgo
 #Run test
 # Some of these tests assume immediate binding, which is a random node, however if multiple volumes are involved sometimes they end up on different nodes and the test fails. Excluding that test.
 SKIP_TESTS='immediate binding|External.Storage.*should access to two volumes with the same volume mode and retain data across pod recreation on the same node \[LinuxOnly\]'
