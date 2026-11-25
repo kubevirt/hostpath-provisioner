@@ -1,0 +1,21 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: hostpath-csi-quota-mixed-block
+provisioner: kubevirt.io.hostpath-provisioner
+parameters:
+  enforceQuota: "true"
+  storagePool: "block"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: hostpath-csi-quota-mixed-filesystem
+provisioner: kubevirt.io.hostpath-provisioner
+parameters:
+  enforceQuota: "true"
+  storagePool: "filesystem"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer

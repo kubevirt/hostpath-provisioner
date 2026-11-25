@@ -1,0 +1,10 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: hostpath-csi-quota-filesystem
+provisioner: kubevirt.io.hostpath-provisioner
+parameters:
+  enforceQuota: "true"
+  storagePool: "ceph"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
