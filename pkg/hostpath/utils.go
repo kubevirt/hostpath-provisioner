@@ -111,16 +111,6 @@ func DeleteVolume(base, volID string) error {
 	return nil
 }
 
-// IndexOfStartingToken returns the index of a matching string, or -1 if not found
-func IndexOfStartingToken(value string, list []string) int {
-	for i, match := range list {
-		if filepath.Base(match) == value {
-			return i
-		}
-	}
-	return -1
-}
-
 // IndexOfSnapshotId returns the index of a matching snapshotId, or -1 if not found
 func IndexOfSnapshotId(value string, list []csi.Snapshot) int {
 	for i, match := range list {
