@@ -291,6 +291,13 @@ func RunPrometheusServer(metricsAddr, certFile, keyFile, tlsVersion, tlsCiphers,
 		Handler: mux,
 	}
 
+	// Serve HTTP/1.1 only. Go's HTTP/2 server refuses to start when a TLS 1.2
+	// CipherSuites list lacks ECDHE-*-AES128-GCM-SHA256, which an admin-chosen
+	// TLS profile may leave out. HTTP/2 isn't needed for Prometheus scraping and
+	// is commonly disabled on metrics endpoints (HTTP/2 Rapid Reset CVEs).
+	server.Protocols = new(http.Protocols)
+	server.Protocols.SetHTTP1(true)
+
 	// Validate certificate configuration
 	certProvided := certFile != ""
 	keyProvided := keyFile != ""
