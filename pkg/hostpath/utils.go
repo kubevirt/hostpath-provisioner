@@ -185,6 +185,90 @@ func getTLSVersion(versionName string) *uint16 {
 	return nil
 }
 
+// There is a one-to-one mapping between these names and the group IDs defined
+// in Go's crypto/tls package based on IANA's "TLS Supported Groups" registry:
+// https://www.iana.org/assignments/tls-parameters/tls-parameters.xhtml#tls-parameters-8
+const (
+	// tlsGroupX25519 represents X25519.
+	tlsGroupX25519 = "X25519"
+	// tlsGroupSecP256r1 represents P-256 (secp256r1).
+	tlsGroupSecP256r1 = "secp256r1"
+	// tlsGroupSecP384r1 represents P-384 (secp384r1).
+	tlsGroupSecP384r1 = "secp384r1"
+	// tlsGroupSecP521r1 represents P-521 (secp521r1).
+	tlsGroupSecP521r1 = "secp521r1"
+	// tlsGroupX25519MLKEM768 represents X25519MLKEM768.
+	tlsGroupX25519MLKEM768 = "X25519MLKEM768"
+	// tlsGroupSecP256r1MLKEM768 represents SecP256r1MLKEM768.
+	tlsGroupSecP256r1MLKEM768 = "SecP256r1MLKEM768"
+	// tlsGroupSecP384r1MLKEM1024 represents SecP384r1MLKEM1024.
+	tlsGroupSecP384r1MLKEM1024 = "SecP384r1MLKEM1024"
+)
+
+// groupsToCurves translates groups names to CurveID which can go straight to the tls.Config
+func groupsToCurves(names []string) []tls.CurveID {
+	// ref: https://www.iana.org/assignments/tls-parameters/tls-parameters.xml#tls-parameters-8
+	var idByName = map[string]tls.CurveID{
+		tlsGroupX25519:             tls.X25519,
+		tlsGroupSecP256r1:          tls.CurveP256,
+		tlsGroupSecP384r1:          tls.CurveP384,
+		tlsGroupSecP521r1:          tls.CurveP521,
+		tlsGroupX25519MLKEM768:     tls.X25519MLKEM768,
+		tlsGroupSecP256r1MLKEM768:  tls.SecP256r1MLKEM768,
+		tlsGroupSecP384r1MLKEM1024: tls.SecP384r1MLKEM1024,
+	}
+
+	var ids []tls.CurveID
+	for _, name := range names {
+		if id, ok := idByName[name]; ok {
+			ids = append(ids, id)
+		}
+	}
+
+	return ids
+}
+
+func cipherSuitesIDs(names []string) []uint16 {
+	// ref: https://www.iana.org/assignments/tls-parameters/tls-parameters.xml
+	var idByName = map[string]uint16{
+		// TLS 1.2
+		"ECDHE-ECDSA-AES128-GCM-SHA256": tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+		"ECDHE-RSA-AES128-GCM-SHA256":   tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		"ECDHE-ECDSA-AES256-GCM-SHA384": tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+		"ECDHE-RSA-AES256-GCM-SHA384":   tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+		"ECDHE-ECDSA-CHACHA20-POLY1305": tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+		"ECDHE-RSA-CHACHA20-POLY1305":   tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+		"ECDHE-ECDSA-AES128-SHA256":     tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
+		"ECDHE-RSA-AES128-SHA256":       tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
+		"AES128-GCM-SHA256":             tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+		"AES256-GCM-SHA384":             tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+		"AES128-SHA256":                 tls.TLS_RSA_WITH_AES_128_CBC_SHA256,
+
+		// TLS 1
+		"ECDHE-ECDSA-AES128-SHA": tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+		"ECDHE-RSA-AES128-SHA":   tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+		"ECDHE-ECDSA-AES256-SHA": tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+		"ECDHE-RSA-AES256-SHA":   tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+
+		// SSL 3
+		"AES128-SHA":   tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+		"AES256-SHA":   tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+		"DES-CBC3-SHA": tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA,
+	}
+	for _, cipherSuite := range tls.CipherSuites() {
+		idByName[cipherSuite.Name] = cipherSuite.ID
+	}
+
+	var ids []uint16
+	for _, name := range names {
+		if id, ok := idByName[name]; ok {
+			ids = append(ids, id)
+		}
+	}
+
+	return ids
+}
+
 // RunPrometheusServer runs a prometheus server for metrics with TLS support.
 // If certFile and keyFile are provided, they will be used for TLS.
 // Otherwise, a self-signed certificate will be generated automatically.
