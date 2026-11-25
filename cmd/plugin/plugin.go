@@ -31,10 +31,14 @@ func init() {
 func main() {
 	defer klog.Flush()
 	cfg := &hostpath.Config{}
-	var dataDir string
-	var metricsCertFile string
-	var metricsKeyFile string
-	var metricsTLSVersion string
+	var (
+		dataDir           string
+		metricsCertFile   string
+		metricsKeyFile    string
+		metricsTLSVersion string
+		metricsTLSCiphers string
+		metricsTLSGroups  string
+	)
 	klog.InitFlags(nil)
 	flag.Set("logtostderr", "true")
 	flag.StringVar(&cfg.Endpoint, "endpoint", "unix://tmp/csi.sock", "CSI endpoint")
@@ -45,10 +49,14 @@ func main() {
 	flag.StringVar(&metricsCertFile, "metrics-cert-file", "", "path to TLS certificate file for metrics server (optional, will use self-signed cert if not provided). Note: self-signed certs only include localhost+127.0.0.1 by default; set POD_IP (most important), POD_NAMESPACE, and SERVICE_NAME env vars for in-cluster SANs needed for certificate verification")
 	flag.StringVar(&metricsKeyFile, "metrics-key-file", "", "path to TLS key file for metrics server (optional, will use self-signed cert if not provided)")
 	flag.StringVar(&metricsTLSVersion, "metrics-tls-version", "VersionTLS13", "minimum TLS version for metrics server (VersionTLS10, VersionTLS11, VersionTLS12, or VersionTLS13)")
+	flag.StringVar(&metricsTLSCiphers, "metrics-tls-ciphers", "",
+		"comma-separated list of TLS cipher suites for the metrics server, using OpenSSL names (e.g. ECDHE-RSA-AES128-GCM-SHA256). Applies only to TLS 1.2 and below; TLS 1.3 suites are not configurable in Go. Empty uses Go defaults")
+	flag.StringVar(&metricsTLSGroups, "metrics-tls-groups", "",
+		"comma-separated list of TLS key exchange groups for the metrics server (e.g. X25519,secp256r1,X25519MLKEM768). Empty uses Go defaults")
 	flag.Parse()
 
 	klog.V(1).Info("Starting Prometheus metrics endpoint server")
-	hostpath.RunPrometheusServer(":8443", metricsCertFile, metricsKeyFile, metricsTLSVersion)
+	hostpath.RunPrometheusServer(":8443", metricsCertFile, metricsKeyFile, metricsTLSVersion, metricsTLSCiphers, metricsTLSGroups)
 
 	klog.V(1).Infof("Starting new HostPathDriver, config: %v", *cfg)
 	ctx := signals.SetupSignalHandler()

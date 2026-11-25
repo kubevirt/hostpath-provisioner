@@ -273,7 +273,12 @@ func cipherSuitesIDs(names []string) []uint16 {
 // If certFile and keyFile are provided, they will be used for TLS.
 // Otherwise, a self-signed certificate will be generated automatically.
 // tlsVersion should be "VersionTLS10", "VersionTLS11", "VersionTLS12", or "VersionTLS13" (default: "VersionTLS13").
-func RunPrometheusServer(metricsAddr, certFile, keyFile, tlsVersion string) {
+// tlsCiphers is a comma-separated list of cipher suite names (OpenSSL names
+// such as ECDHE-RSA-AES128-GCM-SHA256, or Go's names) and only affects TLS 1.2
+// and below. tlsGroups is a comma-separated list of key exchange groups, such
+// as "X25519,secp256r1". Unknown names are ignored, and an empty list leaves
+// Go's defaults in place.
+func RunPrometheusServer(metricsAddr, certFile, keyFile, tlsVersion, tlsCiphers, tlsGroups string) {
 	err := metrics.SetupMetrics()
 	if err != nil {
 		klog.Error(err, "Failed to Setup Prometheus metrics")
@@ -301,9 +306,21 @@ func RunPrometheusServer(metricsAddr, certFile, keyFile, tlsVersion string) {
 		minTLSVersion = &defaultVersion
 	}
 
+	var ciphers []uint16
+	if tlsCiphers != "" {
+		ciphers = cipherSuitesIDs(strings.Split(tlsCiphers, ","))
+	}
+
+	var curves []tls.CurveID
+	if tlsGroups != "" {
+		curves = groupsToCurves(strings.Split(tlsGroups, ","))
+	}
+
 	// Configure TLS
 	tlsConfig := &tls.Config{
-		MinVersion: *minTLSVersion,
+		MinVersion:       *minTLSVersion,
+		CurvePreferences: curves,
+		CipherSuites:     ciphers,
 	}
 
 	// If cert and key files are provided, use them
